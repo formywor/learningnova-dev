@@ -7,17 +7,17 @@
   <style>
     :root{--bg:#0b1220;--card:#121a2b;--ink:#eaf2ff;--muted:#a9b6c7;--accent:#7dd3fc;--ring:rgba(125,211,252,.35)}
     body{margin:0;background:linear-gradient(180deg,#08101e,#0b1220);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif}
-    header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d}
+    header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d;position:sticky;top:0;z-index:10}
     .wrap{max-width:900px;margin:0 auto;padding:16px}
     .card{background:#121a2b;border:1px solid #1b2a45;border-radius:14px;padding:14px}
-    .row{display:flex;gap:8px;align-items:center}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     input{padding:8px;border-radius:10px;border:1px solid #1f3356;background:#0a1426;color:var(--ink)}
     .btn{padding:8px 12px;border-radius:10px;border:1px solid #204065;background:#101b31;color:var(--ink);cursor:pointer}
     .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
     .pill{display:inline-block;padding:4px 10px;border:1px solid #2a3f65;border-radius:999px;background:#0e1a2e}
     .muted{color:#a9b6c7}
     .list{display:grid;gap:8px}
-    .item{display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid #1b2a45;border-radius:12px;background:#0f172a}
+    .item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid #1b2a45;border-radius:12px;background:#0f172a}
     a{color:var(--accent);text-decoration:none}
   </style>
 </head>
@@ -27,8 +27,12 @@
     <span class="pill">LearningNova – Dashboard</span>
     <a href="./auth.html" class="pill">Login / Signup</a>
   </div>
-  <div class="row"><span id="authState" class="muted">Checking auth…</span><button id="signOut" class="btn" style="display:none">Sign Out</button></div>
+  <div class="row">
+    <span id="authState" class="muted">Checking auth…</span>
+    <button id="signOut" class="btn" style="display:none">Sign Out</button>
+  </div>
 </header>
+
 <div class="wrap">
   <div class="card">
     <h3>Create a new site <small class="muted">(max 3)</small></h3>
@@ -46,24 +50,30 @@
   </div>
 </div>
 
+<!-- Firebase + App -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-  import { getFirestore, collection, query, where, getDocs, limit, doc, getDoc, setDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import {
+    getFirestore, collection, query, where, getDocs, limit as qlimit,
+    doc, getDoc, setDoc, serverTimestamp, deleteDoc
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
   import { firebaseConfig } from "./firebase-config.js";
 
+  // Init
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // UI
   const $ = s => document.querySelector(s);
   const authState = $("#authState");
+  const btnSignOut = $("#signOut");
   const sitename = $("#sitename");
   const previewName = $("#previewName");
   const createBtn = $("#createBtn");
   const limitMsg = $("#limitMsg");
   const siteList = $("#siteList");
-  const btnSignOut = $("#signOut");
 
   sitename.addEventListener("input", e=>{
     e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"");
@@ -71,7 +81,12 @@
   });
 
   onAuthStateChanged(auth, async (user)=>{
-    if (!user){ authState.textContent="Not signed in"; btnSignOut.style.display="none"; siteList.innerHTML=""; return; }
+    if (!user) {
+      authState.textContent = "Not signed in";
+      btnSignOut.style.display = "none";
+      siteList.innerHTML = "";
+      return;
+    }
     authState.textContent = user.email || "Signed in";
     btnSignOut.style.display = "inline-block";
     await reloadSites();
@@ -81,54 +96,93 @@
 
   async function reloadSites(){
     const user = auth.currentUser;
-    if (!user){ siteList.innerHTML=""; return; }
-    const q = query(collection(db,"sites"), where("ownerUid","==", user.uid), limit(10));
+    if (!user){ siteList.innerHTML = ""; return; }
+
+    const q = query(collection(db,"sites"), where("ownerUid","==", user.uid), qlimit(10));
     const snap = await getDocs(q);
-    const items = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+
     siteList.innerHTML = "";
     if (items.length >= 3){
-      createBtn.disabled = true; sitename.disabled = true; limitMsg.textContent = "Limit reached: 3 sites.";
+      createBtn.disabled = true; sitename.disabled = true;
+      limitMsg.textContent = "Limit reached: 3 sites. Delete one to create another.";
     } else {
-      createBtn.disabled = false; sitename.disabled = false; limitMsg.textContent = "";
+      createBtn.disabled = false; sitename.disabled = false;
+      limitMsg.textContent = "";
     }
+
     for (const s of items){
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
+      const row = document.createElement("div");
+      row.className = "item";
+      row.innerHTML = `
         <div>
-          <b>${s.id}</b> &nbsp; <span class="muted">${s.published? "published":"unpublished"}</span>
+          <b>${s.id}</b>
+          &nbsp; <span class="muted">${s.published ? "published" : "unpublished"}</span>
         </div>
         <div class="row">
-          <a href="./make/?site=${encodeURIComponent(s.id)}" class="pill">Open Editor</a>
-          <a href="./settings.html?site=${encodeURIComponent(s.id)}" class="pill">Settings</a>
-          <a href="https://learningnova.site/${encodeURIComponent(s.id)}" class="pill" target="_blank">View</a>
-          <button data-del="${s.id}" class="btn" style="border-color:#6b1d1d;background:#2a0f10">Delete</button>
+          <a class="pill" href="./make/?site=${encodeURIComponent(s.id)}">Open Editor</a>
+          <a class="pill" href="./settings.html?site=${encodeURIComponent(s.id)}">Settings</a>
+          <a class="pill" target="_blank" href="https://learningnova.site/${encodeURIComponent(s.id)}">View</a>
+          <button class="btn" data-del="${s.id}" style="border-color:#6b1d1d;background:#2a0f10">Delete</button>
         </div>`;
-      siteList.appendChild(div);
-      div.querySelector(`[data-del="${s.id}"]`).onclick = async ()=>{
+      siteList.appendChild(row);
+
+      row.querySelector(`[data-del="${s.id}"]`).onclick = async ()=>{
         if (!confirm(`Delete site "${s.id}"?`)) return;
         await deleteDoc(doc(db,"sites",s.id));
-        reloadSites();
+        await reloadSites();
       };
     }
   }
 
+  // ---- CREATE HANDLER (with diagnostics) ----
   createBtn.onclick = async ()=>{
-    const user = auth.currentUser;
-    if (!user) return alert("Sign in first (Auth → Authorized domains must include dev.learningnova.site).");
-    const name = sitename.value.trim();
-    if (!name) return alert("Enter a sitename.");
-    const ref = doc(db,"sites",name);
-    const exists = await getDoc(ref);
-    if (exists.exists()) return alert("That name is taken.");
-    await setDoc(ref,{
-      ownerUid: user.uid,
-      published: false,
-      title: "My Site",
-      updatedAt: serverTimestamp(),
-      pages: { home:{ title:"Home", blocks:[ { id:"b1", type:"text", html:"<h1>Welcome!</h1><p>Edit this in the editor.</p>" } ] } }
-    });
-    location.href = `./make/?site=${encodeURIComponent(name)}`;
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Sign in first. (Also be sure Firebase Auth → Authorized domains includes dev.learningnova.site)");
+        return;
+      }
+
+      // Refresh ID token to avoid edge cases
+      await user.getIdToken(true);
+
+      const name = sitename.value.trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
+      if (!name) return alert("Enter a sitename.");
+      const ref = doc(db, "sites", name);
+
+      // Preflight existence
+      const existsSnap = await getDoc(ref);
+      console.log("[create preflight] uid:", user.uid, "sitename:", name, "exists:", existsSnap.exists());
+      if (existsSnap.exists()) { alert("That name is taken."); return; }
+
+      // Must match Firestore rules requirements
+      const payload = {
+        ownerUid: user.uid,         // must equal request.auth.uid
+        published: false,           // must be false on create
+        title: "My Site",
+        updatedAt: serverTimestamp(),
+        pages: {
+          home: {
+            title: "Home",
+            blocks: [
+              { id: "b1", type: "text", html: "<h1>Welcome!</h1><p>Edit this in the editor.</p>" }
+            ]
+          }
+        }
+      };
+      console.log("[create] writing payload:", payload);
+
+      // First write MUST be setDoc (not updateDoc)
+      await setDoc(ref, payload);
+
+      console.log("[create] success → redirecting to /make");
+      location.href = `./make/?site=${encodeURIComponent(name)}`;
+
+    } catch (e) {
+      console.error("[create] error:", e);
+      alert("Create failed: " + (e.message || e.code || e));
+    }
   };
 </script>
 </body>
