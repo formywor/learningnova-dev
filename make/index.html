@@ -27,7 +27,7 @@
     }
     .code{
       padding:10px;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
-      line-height:1.4; font-family:ui-monospace,Menlo,monospace; font-size:13px; height:55vh; overflow:auto;
+      line-height:1.4; font-family:ui-monospace,Menlo,monospace; font-size:13px; height:55vh; overflow:auto; white-space:pre;
     }
     .status{min-height:1.2em}
     .warn{color:#fde68a}
@@ -60,7 +60,7 @@
       <button id="saveBtn" class="btn">Save Now</button>
       <span class="muted status" id="saveState">Idle</span>
     </div>
-    <p class="note">Autosave: 1s after you stop typing.</p>
+    <p class="note">Autosave: <b>5s</b> after you stop typing.</p>
 
     <div class="divider"></div>
     <div class="row">
@@ -92,17 +92,17 @@
 
 <script type="module">
   /***************  PASTE YOUR OPENAI KEY HERE  *****************
-   * You said you accept the risk. This key will be visible to anyone
-   * who can view your site’s source. We’ll strip any commas you add.
+   * You accept the risk. This is visible client-side.
+   * We will strip any commas you add.
    **************************************************************/
   const OPENAI_KEY = "sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA";
 
-  // Sanitizer: remove commas & whitespace
+  // Sanitize: remove commas & whitespace
   function getOpenAIKey(){
     return String(OPENAI_KEY).replace(/,/g,"").trim();
   }
 
-  // Simple OpenAI Chat Completion helper (JSON-in / JSON-out pattern)
+  // Call OpenAI Chat Completions; expect JSON content back
   async function openAiJson(promptMessages, {temperature=0.2}={}){
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -167,13 +167,17 @@
 
   // ----- line-number gutter sync -----
   function updateGutter(){
-    const lines = htmlBox.value.split("\n").length || 1;
+    const lines = htmlBox.value === "" ? 1 : (htmlBox.value.match(/\n/g)?.length ?? 0) + 1;
+    // Build once, efficiently
     let buf = "";
     for (let i=1;i<=lines;i++) buf += i + "\n";
     gutter.textContent = buf;
     gutter.scrollTop = htmlBox.scrollTop;
   }
-  htmlBox.addEventListener("input", ()=>updateGutter());
+  // Keep numbers accurate on all edits & scroll
+  ["input","change","keyup","paste"].forEach(evt=>{
+    htmlBox.addEventListener(evt, updateGutter);
+  });
   htmlBox.addEventListener("scroll", ()=>{ gutter.scrollTop = htmlBox.scrollTop; });
 
   // ----- auth & data subscription -----
@@ -191,7 +195,7 @@
       renderPageList();
       renderEditor();
       renderPreview();
-      updateGutter();
+      updateGutter(); // ensure numbers render immediately
     });
   }
 
@@ -252,11 +256,12 @@
 
   saveBtn.onclick = saveNow;
 
+  // AUTOSAVE: 5 seconds after last keystroke
   htmlBox.addEventListener("input", ()=>{
     saveState.textContent = "Typing…";
     clearTimeout(typingTimer);
-    typingTimer = setTimeout(saveNow, 1000); // autosave
-    // auto AI check 2s after you stop typing
+    typingTimer = setTimeout(saveNow, 5000); // 5s
+    // Auto AI check 2s after you stop typing (separate timer)
     clearTimeout(aiTypingTimer);
     aiTypingTimer = setTimeout(()=>runCheck(false), 2000);
   });
@@ -268,7 +273,7 @@
       const page = siteData.pages[currentSlug];
       const html = ensureFirstTextBlock(page).html || "";
 
-      const prompt = [
+      const promptMessages = [
         { role: "system", content: "You are an expert web auditor. Return JSON ONLY with keys ok (boolean), summary (short), warnings (array), suggestions (array)." },
         { role: "user", content:
 `Audit this HTML. Check:
@@ -287,7 +292,7 @@ HTML:
 ${html}` }
       ];
 
-      const res = await openAiJson(prompt, { temperature: 0.2 });
+      const res = await openAiJson(promptMessages, { temperature: 0.2 });
       const ok = !!res.ok;
       const warnings = Array.isArray(res.warnings)?res.warnings:[];
       const suggestions = Array.isArray(res.suggestions)?res.suggestions:[];
@@ -309,13 +314,13 @@ ${html}` }
   /**************** AI: Website Builder (BETA, client-side) ************/
   aiBuildBtn.onclick = async ()=>{
     try{
-      const desc = prompt("Describe the site you want (e.g., 'Portfolio for a photographer with Home, Gallery, Contact').");
+      const desc = window.prompt("Describe the site you want (e.g., 'Portfolio for a photographer with Home, Gallery, Contact').");
       if (!desc) return;
-      const pagesHint = prompt("Optional: comma-separated page slugs (e.g., home,about,contact). Leave blank to let AI choose.");
+      const pagesHint = window.prompt("Optional: comma-separated page slugs (e.g., home,about,contact). Leave blank to let AI choose.");
 
       aiBuildOutput.textContent = "Thinking… (BETA)";
 
-      const prompt = [
+      const promptMessages = [
         { role: "system", content: "You are a website generator that outputs clean, responsive HTML sections for multiple pages. Use modern semantic HTML and minimal inline CSS. Return JSON only." },
         { role: "user", content:
 `Generate HTML for a small static site.
@@ -332,7 +337,7 @@ Site description:
 ${desc}` }
       ];
 
-      const res = await openAiJson(prompt, { temperature: 0.5 });
+      const res = await openAiJson(promptMessages, { temperature: 0.5 });
       const pages = res.pages || {};
       const warning = res.warning || "BETA: This will replace your current page content.";
 
