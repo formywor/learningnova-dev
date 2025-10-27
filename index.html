@@ -140,14 +140,15 @@
     try {
       const user = auth.currentUser;
       if (!user) {
-        alert("Sign in first. (Also be sure Firebase Auth → Authorized domains includes dev.learningnova.site)");
+        alert("Sign in first. (And ensure Firebase Auth → Authorized domains includes dev.learningnova.site)");
         return;
       }
 
       // Refresh ID token to avoid edge cases
       await user.getIdToken(true);
 
-      const name = sitename.value.trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
+      const nameRaw = sitename.value.trim();
+      const name = nameRaw.toLowerCase().replace(/[^a-z0-9-]/g,"");
       if (!name) return alert("Enter a sitename.");
       const ref = doc(db, "sites", name);
 
@@ -156,7 +157,7 @@
       console.log("[create preflight] uid:", user.uid, "sitename:", name, "exists:", existsSnap.exists());
       if (existsSnap.exists()) { alert("That name is taken."); return; }
 
-      // Must match Firestore rules requirements
+      // Payload must satisfy your Firestore rules
       const payload = {
         ownerUid: user.uid,         // must equal request.auth.uid
         published: false,           // must be false on create
