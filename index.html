@@ -1,0 +1,354 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>LearningNova – Editor</title>
+  <style>
+    :root {
+      --bg:#0b1220; --card:#121a2b; --ink:#eaf2ff; --muted:#a9b6c7;
+      --accent:#7dd3fc; --accent2:#34d399; --danger:#ef4444; --ring:rgba(125,211,252,.35)
+    }
+    body{margin:0;background:linear-gradient(180deg,#08101e,#0b1220);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d;position:sticky;top:0;z-index:10}
+    header h1{margin:0;font-size:16px}
+    a{color:var(--accent);text-decoration:none}
+    .btn{padding:8px 12px;border:1px solid #204065;border-radius:10px;background:#101b31;color:var(--ink);cursor:pointer}
+    .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
+    .btn.accent{border-color:#2aa3c7;background:#0f2434}
+    .btn.danger{border-color:#6b1d1d;background:#2a0f10}
+    .wrap{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:16px}
+    .card{background:var(--card);border:1px solid #1b2a45;border-radius:14px}
+    .pane{padding:14px}
+    input{width:100%;padding:8px;border-radius:10px;border:1px solid #1f3356;background:#0a1426;color:var(--ink)}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #2a3f65;border-radius:999px;background:#0e1a2e}
+    .muted{color:var(--muted)}
+    #siteList button{display:block;width:100%;text-align:left;margin:6px 0}
+    .row{display:flex;gap:8px;align-items:center}
+    .nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .nav .pill[aria-current="page"]{border-color:#60a5fa}
+    #editorCanvas{min-height:60vh;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .block{background:#0e1a2f;border:1px dashed #29415f;border-radius:12px;padding:12px}
+    .block[contenteditable="true"]:focus{outline:none;border-style:solid;box-shadow:0 0 0 3px var(--ring)}
+    .hidden{display:none}
+    .context{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<header>
+  <h1>LearningNova Builder</h1>
+  <div class="row">
+    <a href="./auth.html" class="pill">Login / Signup</a>
+    <span id="authState" class="muted">Checking auth…</span>
+    <button id="signOut" class="btn hidden">Sign Out</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="card pane">
+    <h3>My Sites <small class="muted">(max 3)</small></h3>
+    <div id="siteList" class="nav"></div>
+    <div id="createBox" style="margin-top:10px">
+      <input id="newSitename" placeholder="unique-name (a–z, 0–9, -)"/>
+      <button id="createSite" class="btn accent" style="margin-top:6px">Create Site</button>
+      <p class="context">URL: learningnova.site/<b id="previewName">yourname</b></p>
+      <p id="limitMsg" class="muted"></p>
+    </div>
+    <hr style="border-color:#1b2a45;margin:14px 0"/>
+    <div id="siteControls" class="hidden">
+      <label class="muted">Title</label>
+      <input id="siteTitle" placeholder="My Site"/>
+      <div class="row" style="margin-top:8px">
+        <span id="pubBadge" class="pill">unpublished</span>
+        <span class="muted" style="margin-left:auto"><small>Updated <span id="updatedAt">—</span></small></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="saveBtn" class="btn accent">Save</button>
+        <button id="publishBtn" class="btn">Publish</button>
+        <button id="unpublishBtn" class="btn">Unpublish</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="deleteSiteBtn" class="btn danger">Delete Site</button>
+      </div>
+
+      <hr style="border-color:#1b2a45;margin:14px 0"/>
+      <h3>Pages</h3>
+      <div id="pageTabs" class="nav"></div>
+      <div class="row" style="margin-top:8px">
+        <input id="newPageSlug" placeholder="page-slug (home, about…)"/>
+        <button id="addPageBtn" class="btn">Add Page</button>
+      </div>
+      <p class="context">Right-click a page tab to delete it.</p>
+    </div>
+  </aside>
+
+  <main class="card pane">
+    <div id="editorArea" class="hidden">
+      <div class="row">
+        <button id="addText" class="btn">+ Text Box</button>
+        <span id="currentPath" class="pill" style="margin-left:auto">/</span>
+      </div>
+      <section id="editorCanvas"></section>
+      <p class="context">Right-click a block to delete it.</p>
+    </div>
+    <div id="welcome">
+      <h2>Welcome</h2>
+      <p class="muted">Sign in on <a href="./auth.html">Login / Signup</a>, create or select a site (max 3),
+        add pages & text, then <b>Publish</b>. Public URL will be <span class="pill">learningnova.site/&lt;sitename&gt;</span>.</p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  import {
+    getFirestore, collection, query, where, getDocs, limit,
+    doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, deleteDoc
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { firebaseConfig } from "./firebase-config.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const state = { uid:null, sites:[], current:null, data:null, unsub:null, currentPage:null };
+
+  // UI refs
+  const authState = $("#authState");
+  const btnSignOut = $("#signOut");
+  const siteList = $("#siteList");
+  const createBox = $("#createBox");
+  const newSitename = $("#newSitename");
+  const previewName = $("#previewName");
+  const limitMsg = $("#limitMsg");
+  const siteControls = $("#siteControls");
+  const editorArea = $("#editorArea");
+  const welcome = $("#welcome");
+  const pageTabs = $("#pageTabs");
+  const editorCanvas = $("#editorCanvas");
+  const currentPath = $("#currentPath");
+
+  newSitename.addEventListener("input", e=>{
+    e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"");
+    previewName.textContent = e.target.value || "yourname";
+  });
+
+  // Auth
+  onAuthStateChanged(auth, async (user)=>{
+    if (!user) {
+      state.uid = null;
+      authState.textContent = "Not signed in";
+      btnSignOut.classList.add("hidden");
+      setEditing(null);
+      siteList.innerHTML = "";
+      showWelcome(true);
+      return;
+    }
+    state.uid = user.uid;
+    authState.textContent = user.email || "Signed in";
+    btnSignOut.classList.remove("hidden");
+    await reloadSites();
+  });
+  btnSignOut.onclick = async ()=>{ await signOut(auth); };
+
+  // Load my sites (max 3 in UI)
+  async function reloadSites() {
+    const q = query(collection(db,"sites"), where("ownerUid","==", state.uid), limit(10));
+    const snap = await getDocs(q);
+    state.sites = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderSiteList();
+    showWelcome(state.sites.length===0);
+    enforceCreateLimit();
+  }
+
+  function renderSiteList() {
+    siteList.innerHTML = "";
+    state.sites.forEach(s=>{
+      const b = document.createElement("button");
+      b.className = "pill";
+      b.textContent = s.id + (s.published ? " • published":"");
+      b.onclick = ()=>selectSite(s.id);
+      b.oncontextmenu = async (e)=>{
+        e.preventDefault();
+        if (!confirm(`Delete site "${s.id}"?`)) return;
+        await deleteDoc(doc(db,"sites",s.id));
+        if (state.current === s.id) setEditing(null);
+        await reloadSites();
+      };
+      siteList.appendChild(b);
+    });
+  }
+
+  function enforceCreateLimit() {
+    const used = state.sites.length;
+    if (used >= 3) {
+      $("#createSite").disabled = true;
+      newSitename.disabled = true;
+      limitMsg.textContent = "Limit reached: 3 sites. Delete one to create another.";
+    } else {
+      $("#createSite").disabled = false;
+      newSitename.disabled = false;
+      limitMsg.textContent = "";
+    }
+  }
+
+  $("#createSite").onclick = async ()=>{
+    if (!state.uid) return alert("Sign in first.");
+    if (state.sites.length >= 3) return alert("You already have 3 sites.");
+    const name = newSitename.value.trim();
+    if (!name) return alert("Enter a sitename.");
+    const ref = doc(db,"sites",name);
+    const snap = await getDoc(ref);
+    if (snap.exists()) return alert("That name is taken.");
+    await setDoc(ref, {
+      ownerUid: state.uid,
+      published: false,
+      title: "My Site",
+      updatedAt: serverTimestamp(),
+      pages: { home:{ title:"Home", blocks:[] } }
+    });
+    newSitename.value = "";
+    await reloadSites();
+    selectSite(name);
+  };
+
+  async function selectSite(id) {
+    // cleanup previous
+    if (state.unsub) state.unsub();
+    state.current = id;
+    const ref = doc(db,"sites",id);
+    state.unsub = onSnapshot(ref, (snap)=>{
+      if (!snap.exists()) { setEditing(null); reloadSites(); return; }
+      const data = snap.data();
+      if (data.ownerUid !== state.uid) { alert("You do not own this site."); setEditing(null); return; }
+      state.data = data;
+      if (!state.currentPage || !data.pages[state.currentPage]) {
+        state.currentPage = Object.keys(data.pages || {})[0];
+      }
+      updateEditorUI();
+    });
+  }
+
+  function setEditing(onId){
+    if (state.unsub) { state.unsub(); state.unsub = null; }
+    state.current = onId;
+    state.data = null;
+    state.currentPage = null;
+    siteControls.classList.toggle("hidden", !onId);
+    editorArea.classList.toggle("hidden", !onId);
+  }
+
+  function showWelcome(show){
+    welcome.classList.toggle("hidden", !show);
+  }
+
+  function updateEditorUI(){
+    showWelcome(false);
+    siteControls.classList.remove("hidden");
+    editorArea.classList.remove("hidden");
+    $("#siteTitle").value = state.data.title || "";
+    $("#pubBadge").textContent = state.data.published ? "published" : "unpublished";
+    $("#updatedAt").textContent = state.data.updatedAt?.toDate?.().toLocaleString?.() || "—";
+    renderPageTabs();
+    renderCanvas();
+  }
+
+  function renderPageTabs(){
+    pageTabs.innerHTML = "";
+    const entries = Object.entries(state.data.pages || {});
+    for (const [slug,page] of entries){
+      const a = document.createElement("button");
+      a.className = "pill";
+      a.textContent = page.title || slug;
+      if (slug === state.currentPage) a.setAttribute("aria-current","page");
+      a.onclick = ()=>{ state.currentPage = slug; renderCanvas(); renderPageTabs(); };
+      a.oncontextmenu = async (e)=>{
+        e.preventDefault();
+        if (!confirm(`Delete page "${slug}"?`)) return;
+        const pages = {...state.data.pages};
+        delete pages[slug];
+        if (Object.keys(pages).length === 0) return alert("At least one page is required.");
+        await updateDoc(doc(db,"sites",state.current), { pages, updatedAt: serverTimestamp() });
+      };
+      pageTabs.appendChild(a);
+    }
+    currentPath.textContent = `/${state.current}/${state.currentPage || ""}`;
+  }
+
+  function renderCanvas(){
+    editorCanvas.innerHTML = "";
+    const page = state.data.pages[state.currentPage];
+    if (!page) return;
+    for (const block of (page.blocks || [])){
+      const el = document.createElement("div");
+      el.className = "block";
+      el.contentEditable = "true";
+      el.dataset.id = block.id;
+      el.innerHTML = block.html || "<p></p>";
+      el.addEventListener("input", debounce(()=>{
+        block.html = el.innerHTML;
+      }, 250));
+      el.oncontextmenu = (e)=>{
+        e.preventDefault();
+        if (confirm("Delete this block?")){
+          page.blocks = page.blocks.filter(b=>b.id !== block.id);
+          el.remove();
+        }
+      };
+      editorCanvas.appendChild(el);
+    }
+  }
+
+  $("#addPageBtn").onclick = async ()=>{
+    if (!state.current) return;
+    const slugEl = $("#newPageSlug");
+    const slug = (slugEl.value||"").toLowerCase().trim().replace(/[^a-z0-9-]/g,"");
+    if (!slug) return alert("Enter a valid slug.");
+    const pages = {...state.data.pages};
+    if (pages[slug]) return alert("That page already exists.");
+    pages[slug] = { title: slug.charAt(0).toUpperCase()+slug.slice(1), blocks:[] };
+    await updateDoc(doc(db,"sites",state.current), { pages, updatedAt: serverTimestamp() });
+    state.currentPage = slug;
+    slugEl.value = "";
+  };
+
+  $("#addText").onclick = ()=>{
+    const page = state.data.pages[state.currentPage];
+    const id = "b"+Math.random().toString(36).slice(2,8);
+    const block = { id, type:"text", html:"<p>Edit me…</p>" };
+    page.blocks = [...(page.blocks||[]), block];
+    renderCanvas();
+  };
+
+  $("#saveBtn").onclick = async ()=>{
+    if (!state.current) return;
+    await updateDoc(doc(db,"sites",state.current), {
+      title: $("#siteTitle").value.trim() || "My Site",
+      pages: state.data.pages,
+      updatedAt: serverTimestamp()
+    });
+    alert("Saved.");
+  };
+
+  $("#publishBtn").onclick = async ()=>{
+    await updateDoc(doc(db,"sites",state.current), { published:true, updatedAt: serverTimestamp() });
+    alert("Published.");
+  };
+  $("#unpublishBtn").onclick = async ()=>{
+    await updateDoc(doc(db,"sites",state.current), { published:false, updatedAt: serverTimestamp() });
+    alert("Unpublished.");
+  };
+  $("#deleteSiteBtn").onclick = async ()=>{
+    if (!confirm("Delete this site permanently?")) return;
+    await deleteDoc(doc(db,"sites",state.current));
+    setEditing(null);
+    await reloadSites();
+  };
+
+  function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms)} }
+</script>
+</body>
+</html>
