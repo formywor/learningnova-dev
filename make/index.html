@@ -29,12 +29,19 @@
       padding:10px;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
       line-height:1.4; font-family:ui-monospace,Menlo,monospace; font-size:13px; height:55vh; overflow:auto; white-space:pre;
     }
+
     .status{min-height:1.2em}
     .warn{color:#fde68a}
     .ok{color:#86efac}
     .err{color:#fca5a5}
     .note{font-size:12px;color:#a9b6c7}
     .divider{border-top:1px solid #1b2a45;margin:10px 0}
+
+    /* Issues list */
+    #checkOutput ul{margin:8px 0 0 16px;padding:0}
+    #checkOutput li{margin:4px 0;cursor:context-menu}
+    #checkOutput li .tag{display:inline-block;min-width:64px;border:1px solid #2a3f65;border-radius:999px;padding:0 8px;margin-right:6px;background:#0e1a2e}
+    #checkOutput li:hover{background:#0d1730}
   </style>
 </head>
 <body>
@@ -72,7 +79,7 @@
     <div class="divider"></div>
     <div class="row">
       <button id="aiBuildBtn" class="btn">AI Builder (BETA)</button>
-      <span class="note warn">This will replace page code after preview & confirmation.</span>
+      <span class="note warn">Generates distinct, multi-page HTML; replaces pages after you confirm.</span>
     </div>
     <div id="aiBuildOutput" class="note"></div>
   </aside>
@@ -92,29 +99,18 @@
 
 <script type="module">
   /***************  PASTE YOUR OPENAI KEY HERE  *****************
-   * You accept the risk. This is visible client-side.
-   * We will strip any commas you add.
+   * Visible to users (you accept the risk). Commas removed.
    **************************************************************/
   const OPENAI_KEY = "sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA";
+  const OPENAI_MODEL = "gpt-4o-mini";
 
-  // Sanitize: remove commas & whitespace
-  function getOpenAIKey(){
-    return String(OPENAI_KEY).replace(/,/g,"").trim();
-  }
+  function getOpenAIKey(){ return String(OPENAI_KEY).replace(/,/g,"").trim(); }
 
-  // Call OpenAI Chat Completions; expect JSON content back
-  async function openAiJson(promptMessages, {temperature=0.2}={}){
+  async function openAiJson(messages, {temperature=0.2}={}){
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type":"application/json",
-        "Authorization":"Bearer " + getOpenAIKey()
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature,
-        messages: promptMessages
-      })
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer " + getOpenAIKey() },
+      body: JSON.stringify({ model: OPENAI_MODEL, temperature, messages })
     });
     if (!resp.ok){
       const t = await resp.text().catch(()=>resp.statusText);
@@ -122,12 +118,9 @@
     }
     const data = await resp.json();
     const content = data?.choices?.[0]?.message?.content ?? "{}";
-    // Try to parse trailing JSON from the content
     const m = content.match(/\{[\s\S]*\}$/);
-    let parsed;
-    try { parsed = JSON.parse(m ? m[0] : content); }
+    try { return JSON.parse(m ? m[0] : content); }
     catch(e){ throw new Error("Failed to parse AI JSON"); }
-    return parsed;
   }
 
   /*********************  FIREBASE  *****************************/
@@ -163,30 +156,23 @@
   let siteData = null;
   let currentSlug = null;
   let unsub = null;
-  let typingTimer, aiTypingTimer;
+  let typingTimer;
 
-  // ----- line-number gutter sync -----
+  /*************** Line-number gutter (accurate) ****************/
+  function countLines(text){ return text === "" ? 1 : (text.match(/\n/g)?.length ?? 0) + 1; }
   function updateGutter(){
-    const lines = htmlBox.value === "" ? 1 : (htmlBox.value.match(/\n/g)?.length ?? 0) + 1;
-    // Build once, efficiently
+    const lines = countLines(htmlBox.value);
     let buf = "";
     for (let i=1;i<=lines;i++) buf += i + "\n";
     gutter.textContent = buf;
     gutter.scrollTop = htmlBox.scrollTop;
   }
-  // Keep numbers accurate on all edits & scroll
-  ["input","change","keyup","paste"].forEach(evt=>{
-    htmlBox.addEventListener(evt, updateGutter);
-  });
+  ["input","change","keyup","paste"].forEach(evt=> htmlBox.addEventListener(evt, updateGutter));
   htmlBox.addEventListener("scroll", ()=>{ gutter.scrollTop = htmlBox.scrollTop; });
 
-  // ----- auth & data subscription -----
+  /****************** Auth & Firestore sync *********************/
   onAuthStateChanged(auth, (user)=>{
     if (!user){ alert("Sign in first."); location.href="../auth.html"; return; }
-    subscribe();
-  });
-
-  function subscribe(){
     const ref = doc(db,"sites",sitename);
     unsub = onSnapshot(ref, (snap)=>{
       if (!snap.exists()){ alert("Site not found."); location.href="../"; return; }
@@ -195,9 +181,9 @@
       renderPageList();
       renderEditor();
       renderPreview();
-      updateGutter(); // ensure numbers render immediately
+      updateGutter();
     });
-  }
+  });
 
   function renderPageList(){
     pageSel.innerHTML = "";
@@ -256,106 +242,155 @@
 
   saveBtn.onclick = saveNow;
 
-  // AUTOSAVE: 5 seconds after last keystroke
+  // AUTOSAVE: 5 seconds after last keystroke (no auto AI checks)
   htmlBox.addEventListener("input", ()=>{
     saveState.textContent = "Typing…";
     clearTimeout(typingTimer);
-    typingTimer = setTimeout(saveNow, 5000); // 5s
-    // Auto AI check 2s after you stop typing (separate timer)
-    clearTimeout(aiTypingTimer);
-    aiTypingTimer = setTimeout(()=>runCheck(false), 2000);
+    typingTimer = setTimeout(saveNow, 5000);
   });
 
-  /******************** AI: Code Check (client-side) ********************/
-  async function runCheck(showToast=true){
+  /******************** AI Code Check (manual only) *************/
+  checkBtn.onclick = runCheck;
+
+  function extractLines(text){
+    // returns array of lines with 1-based numbering
+    const arr = text.split("\n");
+    return arr.map((line, idx)=>({ num: idx+1, text: line }));
+  }
+
+  // Right-click handler to apply a suggested fix to a line
+  checkOutput.addEventListener("contextmenu", (e)=>{
+    const li = e.target.closest("li[data-line][data-replace]");
+    if (!li) return;
+    e.preventDefault();
+    const lineNum = parseInt(li.getAttribute("data-line"), 10);
+    const replacement = li.getAttribute("data-replace");
+    if (!lineNum || replacement == null) return;
+    const lines = htmlBox.value.split("\n");
+    if (lineNum < 1 || lineNum > lines.length) return;
+    lines[lineNum-1] = replacement; // replace the entire line
+    htmlBox.value = lines.join("\n");
+    updateGutter();
+    saveState.textContent = "Edited (right-click fix). Click Save or wait for autosave.";
+  });
+
+  async function runCheck(){
     try{
       checkState.textContent = "Checking…";
+      checkOutput.innerHTML = "";
       const page = siteData.pages[currentSlug];
       const html = ensureFirstTextBlock(page).html || "";
+      const lines = extractLines(html);
 
-      const promptMessages = [
-        { role: "system", content: "You are an expert web auditor. Return JSON ONLY with keys ok (boolean), summary (short), warnings (array), suggestions (array)." },
+      const messages = [
+        { role: "system", content:
+"Return JSON ONLY.\nSchema:\n{\n  \"summary\": \"short\",\n  \"issues\": [\n    {\"line\": <number>, \"type\": \"syntax|accessibility|structure|seo|other\", \"message\": \"what's wrong\", \"suggestionLine\": \"the full corrected content for that single line\"}\n  ]\n}\nRules:\n- Analyze the provided HTML as multi-line text.\n- If the HTML is minified on one line, reformat mentally to find issues but still return precise line numbers (1 if truly single line).\n- Only suggest a single-line replacement for the specific line (no multi-line replacements).\n- If no issues, return issues: []."
+        },
         { role: "user", content:
-`Audit this HTML. Check:
-- basic structure (doctype, html/head/body best practices)
-- accessibility (lang, title, alt text, labels)
-- mobile meta viewport
-- heading order
-- obvious broken tags
-- excessive inline style bloat
-- contrast red flags
+`HTML to analyze (line numbers provided for reference):
+${lines.map(l=>`${l.num}: ${l.text}`).join("\n")}
 
-Return STRICT JSON only like:
-{"ok":true,"summary":"...","warnings":["..."],"suggestions":["..."]}
-
-HTML:
-${html}` }
+Return JSON only.`}
       ];
 
-      const res = await openAiJson(promptMessages, { temperature: 0.2 });
-      const ok = !!res.ok;
-      const warnings = Array.isArray(res.warnings)?res.warnings:[];
-      const suggestions = Array.isArray(res.suggestions)?res.suggestions:[];
-      checkState.textContent = ok ? "OK" : "Warnings found";
-      checkOutput.innerHTML = `
-        <div class="${ok?'ok':'warn'}"><b>${ok?'Looks good':'Needs attention'}</b> — ${res.summary || '—'}</div>
-        ${warnings.length?('<ul>'+warnings.map(w=>`<li class="warn">${w}</li>`).join('')+'</ul>'):''}
-        ${suggestions.length?('<ul>'+suggestions.map(s=>`<li>${s}</li>`).join('')+'</ul>'):''}
-      `;
-      if (showToast) alert(ok ? "AI Check: Looks good" : "AI Check: See suggestions in the sidebar");
+      const res = await openAiJson(messages, { temperature: 0.1 });
+      const issues = Array.isArray(res.issues) ? res.issues : [];
+      checkState.textContent = issues.length ? `${issues.length} issue(s)` : "No issues found";
+
+      if (!issues.length){
+        checkOutput.innerHTML = `<div class="ok"><b>Looks good.</b> ${res.summary||''}</div>`;
+        return;
+      }
+
+      // Render issues; right-click to apply suggestion
+      const list = document.createElement("ul");
+      issues.forEach(issue=>{
+        const li = document.createElement("li");
+        const ln = Number(issue.line)||1;
+        const type = String(issue.type||"other");
+        const msg = String(issue.message||"");
+        const replaceLine = String(issue.suggestionLine||"");
+        li.setAttribute("data-line", ln);
+        li.setAttribute("data-replace", replaceLine);
+        li.innerHTML = `<span class="tag">Line ${ln}</span><b>${type}</b>: ${escapeHtml(msg)}<br>
+                        <span class="muted">Right-click to apply fix →</span><code>${escapeHtml(replaceLine)}</code>`;
+        list.appendChild(li);
+      });
+      checkOutput.innerHTML = `<div class="warn"><b>Found ${issues.length} issue(s).</b> ${res.summary||''}</div>`;
+      checkOutput.appendChild(list);
+
     } catch(e){
       checkState.textContent = "Error";
-      checkOutput.innerHTML = `<span class="err">AI check failed: ${e.message||e}</span>`;
+      checkOutput.innerHTML = `<span class="err">AI check failed: ${escapeHtml(e.message||String(e))}</span>`;
       console.error(e);
     }
   }
-  checkBtn.onclick = ()=>runCheck(true);
 
-  /**************** AI: Website Builder (BETA, client-side) ************/
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  /**************** AI Website Builder (distinct, multi-line) ***********/
   aiBuildBtn.onclick = async ()=>{
     try{
-      const desc = window.prompt("Describe the site you want (e.g., 'Portfolio for a photographer with Home, Gallery, Contact').");
+      const desc = window.prompt("Describe your site (e.g., 'Portfolio for a photographer with Home, Gallery, Contact').");
       if (!desc) return;
       const pagesHint = window.prompt("Optional: comma-separated page slugs (e.g., home,about,contact). Leave blank to let AI choose.");
 
       aiBuildOutput.textContent = "Thinking… (BETA)";
 
-      const promptMessages = [
-        { role: "system", content: "You are a website generator that outputs clean, responsive HTML sections for multiple pages. Use modern semantic HTML and minimal inline CSS. Return JSON only." },
+      const messages = [
+        { role: "system", content:
+`You generate multiple distinct HTML pages. Output JSON ONLY.
+Schema:
+{
+  "pages": { "<slug>": "<MULTI-LINE html string>", ... },
+  "warning": "short caution"
+}
+Rules:
+- Produce 2–5 pages. If user supplies slugs, use those; otherwise choose sensible slugs (e.g., home, about, contact, services).
+- Each page MUST be substantially different (different titles, sections, and content).
+- HTML MUST be multi-line (well-formatted with indentation); at least ~15 lines per page.
+- Include <header> with navigation appropriate to that page; make nav links anchors (#) only.
+- Minimal inline CSS allowed; do not minify into a single line.
+- Do not duplicate page bodies across different slugs.`
+        },
         { role: "user", content:
-`Generate HTML for a small static site.
-${pagesHint ? "User requested pages: "+pagesHint : "Choose 1–4 sensible pages for the site."}
+`Build a small site.
 
-Constraints:
-- Minimal inline CSS (no external files)
-- Accessible markup (landmarks, alt text, labels)
-- Include a visible header with nav on every page
-- Return STRICT JSON only:
-{ "pages": { "<slug>": "<html string>", ... }, "warning": "<short caution>" }
+Description:
+${desc}
 
-Site description:
-${desc}` }
+${pagesHint ? ("Page slugs (use these): "+pagesHint) : "Choose suitable page slugs yourself."}
+
+Return JSON only using the schema above.`}
       ];
 
-      const res = await openAiJson(promptMessages, { temperature: 0.5 });
+      const res = await openAiJson(messages, { temperature: 0.5 });
       const pages = res.pages || {};
       const warning = res.warning || "BETA: This will replace your current page content.";
 
-      if (!Object.keys(pages).length){
-        aiBuildOutput.innerHTML = '<span class="err">No pages returned.</span>';
+      // Basic distinctness guard: reject if pages are identical strings
+      const vals = Object.values(pages).map(v=>String(v));
+      const distinct = new Set(vals).size === vals.length;
+      if (!Object.keys(pages).length || !distinct){
+        aiBuildOutput.innerHTML = '<span class="err">Generator returned empty or duplicate pages. Try a more specific prompt.</span>';
         return;
       }
 
       const confirmMsg = warning + "\n\nThis will REPLACE the current page HTML for the returned slugs. Continue?";
       if (!confirm(confirmMsg)) { aiBuildOutput.textContent = "Cancelled."; return; }
 
-      // Overwrite page blocks with AI HTML
+      // Write pages (multi-line) to Firestore
       const newPages = {...(siteData.pages||{})};
       for (const [slugRaw, htmlRaw] of Object.entries(pages)){
         const slug = String(slugRaw).toLowerCase().replace(/[^a-z0-9-]/g,"");
         if (!slug) continue;
-        const html = String(htmlRaw).slice(0, 200000);
-        newPages[slug] = { title: slug.charAt(0).toUpperCase()+slug.slice(1), blocks:[{ id:"b"+Math.random().toString(36).slice(2,8), type:"text", html }] };
+        const html = String(htmlRaw);
+        newPages[slug] = {
+          title: slug.charAt(0).toUpperCase()+slug.slice(1),
+          blocks:[{ id:"b"+Math.random().toString(36).slice(2,8), type:"text", html }]
+        };
       }
 
       await updateDoc(doc(db,"sites",sitename), { pages: newPages, updatedAt: serverTimestamp() });
@@ -364,10 +399,10 @@ ${desc}` }
       renderEditor();
       renderPreview();
       updateGutter();
-      aiBuildOutput.innerHTML = `<span class="ok">AI Builder complete.</span>`;
+      aiBuildOutput.innerHTML = `<span class="ok">AI Builder complete. Distinct, multi-line pages applied.</span>`;
     } catch(e){
       console.error(e);
-      aiBuildOutput.innerHTML = `<span class="err">AI Builder failed: ${e.message||e}</span>`;
+      aiBuildOutput.innerHTML = `<span class="err">AI Builder failed: ${escapeHtml(e.message||String(e))}</span>`;
     }
   };
 </script>
