@@ -8,16 +8,33 @@
     :root{--bg:#0b1220;--card:#121a2b;--ink:#eaf2ff;--muted:#a9b6c7;--accent:#7dd3fc;--ring:rgba(125,211,252,.35)}
     body{margin:0;background:linear-gradient(180deg,#08101e,#0b1220);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif}
     header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d}
-    .wrap{display:grid;grid-template-columns:340px 1fr;gap:12px;padding:12px}
+    .wrap{display:grid;grid-template-columns:420px 1fr;gap:12px;padding:12px}
     .card{background:#121a2b;border:1px solid #1b2a45;border-radius:14px;padding:12px}
-    select,input,textarea{width:100%;background:#0a1426;border:1px solid #1f3356;border-radius:10px;color:var(--ink);padding:8px}
-    textarea{min-height:50vh;font-family:ui-monospace,Menlo,monospace}
-    .row{display:flex;gap:8px;align-items:center}
+    select,input,textarea,button{font:inherit}
+    select,input{width:100%;background:#0a1426;border:1px solid #1f3356;border-radius:10px;color:var(--ink);padding:8px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .btn{padding:8px 12px;border-radius:10px;border:1px solid #204065;background:#101b31;color:var(--ink);cursor:pointer}
     .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
     .pill{display:inline-block;padding:4px 10px;border:1px solid #2a3f65;border-radius:999px;background:#0e1a2e}
-    iframe{width:100%;height:70vh;background:#0b1220;border:1px solid #1b2a45;border-radius:12px}
     .muted{color:#a9b6c7}
+    iframe{width:100%;height:70vh;background:#0b1220;border:1px solid #1b2a45;border-radius:12px}
+
+    /* Editor with line numbers */
+    .editor-wrap{display:grid;grid-template-columns:60px 1fr;border:1px solid #1f3356;border-radius:12px;overflow:hidden;background:#0a1426}
+    .gutter{
+      background:#0a1526;color:#6b7c92;text-align:right;padding:10px 6px 10px 8px;
+      user-select:none; overflow:hidden; line-height:1.4; font-family:ui-monospace,Menlo,monospace; font-size:13px;
+    }
+    .code{
+      padding:10px;border:none;outline:none;resize:none;background:transparent;color:var(--ink);
+      line-height:1.4; font-family:ui-monospace,Menlo,monospace; font-size:13px; height:55vh; overflow:auto;
+    }
+    .status{min-height:1.2em}
+    .warn{color:#fde68a}
+    .ok{color:#86efac}
+    .err{color:#fca5a5}
+    .note{font-size:12px;color:#a9b6c7}
+    .divider{border-top:1px solid #1b2a45;margin:10px 0}
   </style>
 </head>
 <body>
@@ -37,22 +54,83 @@
     <h3>Edit Page</h3>
     <label class="muted">Page</label>
     <select id="pageSel"></select>
-    <label class="muted" style="margin-top:8px">HTML</label>
-    <textarea id="htmlBox" spellcheck="false"></textarea>
-    <div class="row" style="margin-top:8px">
+
+    <div class="divider"></div>
+    <div class="row">
       <button id="saveBtn" class="btn">Save Now</button>
-      <span class="muted" id="saveState">Idle</span>
+      <span class="muted status" id="saveState">Idle</span>
     </div>
-    <p class="muted" style="margin-top:6px">Autosave is on: changes are saved a second after you stop typing.</p>
+    <p class="note">Autosave: 1s after you stop typing.</p>
+
+    <div class="divider"></div>
+    <div class="row">
+      <button id="checkBtn" class="btn">Check Code (AI)</button>
+      <span id="checkState" class="status muted">—</span>
+    </div>
+    <div id="checkOutput" class="note"></div>
+
+    <div class="divider"></div>
+    <div class="row">
+      <button id="aiBuildBtn" class="btn">AI Builder (BETA)</button>
+      <span class="note warn">This will replace page code after preview & confirmation.</span>
+    </div>
+    <div id="aiBuildOutput" class="note"></div>
   </aside>
 
   <main class="card">
+    <h3>Code (HTML) with Line Numbers</h3>
+    <div class="editor-wrap">
+      <pre id="gutter" class="gutter">1</pre>
+      <textarea id="htmlBox" class="code" spellcheck="false"></textarea>
+    </div>
+
+    <div class="divider"></div>
     <h3>Live Preview</h3>
     <iframe id="preview"></iframe>
   </main>
 </div>
 
 <script type="module">
+  /***************  PASTE YOUR OPENAI KEY HERE  *****************
+   * You said you accept the risk. This key will be visible to anyone
+   * who can view your site’s source. We’ll strip any commas you add.
+   **************************************************************/
+  const OPENAI_KEY = "sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA";
+
+  // Sanitizer: remove commas & whitespace
+  function getOpenAIKey(){
+    return String(OPENAI_KEY).replace(/,/g,"").trim();
+  }
+
+  // Simple OpenAI Chat Completion helper (JSON-in / JSON-out pattern)
+  async function openAiJson(promptMessages, {temperature=0.2}={}){
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type":"application/json",
+        "Authorization":"Bearer " + getOpenAIKey()
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature,
+        messages: promptMessages
+      })
+    });
+    if (!resp.ok){
+      const t = await resp.text().catch(()=>resp.statusText);
+      throw new Error("OpenAI error: " + t);
+    }
+    const data = await resp.json();
+    const content = data?.choices?.[0]?.message?.content ?? "{}";
+    // Try to parse trailing JSON from the content
+    const m = content.match(/\{[\s\S]*\}$/);
+    let parsed;
+    try { parsed = JSON.parse(m ? m[0] : content); }
+    catch(e){ throw new Error("Failed to parse AI JSON"); }
+    return parsed;
+  }
+
+  /*********************  FIREBASE  *****************************/
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
   import { getFirestore, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -69,9 +147,15 @@
   const $ = s => document.querySelector(s);
   const pageSel = $("#pageSel");
   const htmlBox = $("#htmlBox");
+  const gutter = $("#gutter");
   const preview = $("#preview");
   const saveBtn = $("#saveBtn");
   const saveState = $("#saveState");
+  const checkBtn = $("#checkBtn");
+  const checkState = $("#checkState");
+  const checkOutput = $("#checkOutput");
+  const aiBuildBtn = $("#aiBuildBtn");
+  const aiBuildOutput = $("#aiBuildOutput");
   $("#siteTag").textContent = `/${sitename}`;
   $("#settingsLink").href = `../settings.html?site=${encodeURIComponent(sitename)}`;
   $("#viewLink").href = `https://learningnova.site/${encodeURIComponent(sitename)}`;
@@ -79,8 +163,20 @@
   let siteData = null;
   let currentSlug = null;
   let unsub = null;
-  let typingTimer;
+  let typingTimer, aiTypingTimer;
 
+  // ----- line-number gutter sync -----
+  function updateGutter(){
+    const lines = htmlBox.value.split("\n").length || 1;
+    let buf = "";
+    for (let i=1;i<=lines;i++) buf += i + "\n";
+    gutter.textContent = buf;
+    gutter.scrollTop = htmlBox.scrollTop;
+  }
+  htmlBox.addEventListener("input", ()=>updateGutter());
+  htmlBox.addEventListener("scroll", ()=>{ gutter.scrollTop = htmlBox.scrollTop; });
+
+  // ----- auth & data subscription -----
   onAuthStateChanged(auth, (user)=>{
     if (!user){ alert("Sign in first."); location.href="../auth.html"; return; }
     subscribe();
@@ -95,6 +191,7 @@
       renderPageList();
       renderEditor();
       renderPreview();
+      updateGutter();
     });
   }
 
@@ -112,30 +209,39 @@
       currentSlug = pageSel.value;
       renderEditor();
       renderPreview();
+      updateGutter();
     };
+  }
+
+  function ensureFirstTextBlock(page){
+    if (!page.blocks || !page.blocks.length){
+      page.blocks = [{ id: "b"+Math.random().toString(36).slice(2,8), type:"text", html:"<h1>New page</h1>" }];
+    }
+    let first = page.blocks.find(b=>b.type==="text");
+    if (!first){
+      first = { id: "b"+Math.random().toString(36).slice(2,8), type:"text", html:"<h1>New page</h1>" };
+      page.blocks.unshift(first);
+    }
+    return first;
   }
 
   function renderEditor(){
     const page = siteData.pages[currentSlug];
-    const firstText = (page.blocks||[]).find(b=>b.type==="text");
-    if (!firstText){
-      // initialize a first text block if empty
-      page.blocks = [{ id: "b"+Math.random().toString(36).slice(2,8), type:"text", html:"<h1>New page</h1>" }];
-    }
-    const active = (page.blocks||[]).find(b=>b.type==="text");
-    htmlBox.value = active.html || "";
+    const block = ensureFirstTextBlock(page);
+    htmlBox.value = block.html || "";
   }
 
   function renderPreview(){
     const page = siteData.pages[currentSlug];
     const html = (page.blocks||[]).filter(b=>b.type==="text").map(b=>b.html).join("\n");
-    preview.srcdoc = `<!doctype html><meta charset="utf-8"><style>body{margin:16px;color:#eaf2ff;background:#0b1220;font-family:system-ui,Arial}</style>${html}`;
+    preview.srcdoc = `<!doctype html><meta charset="utf-8">
+      <style>body{margin:16px;color:#eaf2ff;background:#0b1220;font-family:system-ui,Arial} a{color:#7dd3fc}</style>
+      ${html}`;
   }
 
   async function saveNow(){
     const page = siteData.pages[currentSlug];
-    const text = (page.blocks||[]).find(b=>b.type==="text");
-    if (!text) return;
+    const text = ensureFirstTextBlock(page);
     text.html = htmlBox.value;
     saveState.textContent = "Saving…";
     await updateDoc(doc(db,"sites",sitename), { pages: siteData.pages, updatedAt: serverTimestamp() });
@@ -149,8 +255,116 @@
   htmlBox.addEventListener("input", ()=>{
     saveState.textContent = "Typing…";
     clearTimeout(typingTimer);
-    typingTimer = setTimeout(saveNow, 1000); // autosave 1s after typing stops
+    typingTimer = setTimeout(saveNow, 1000); // autosave
+    // auto AI check 2s after you stop typing
+    clearTimeout(aiTypingTimer);
+    aiTypingTimer = setTimeout(()=>runCheck(false), 2000);
   });
+
+  /******************** AI: Code Check (client-side) ********************/
+  async function runCheck(showToast=true){
+    try{
+      checkState.textContent = "Checking…";
+      const page = siteData.pages[currentSlug];
+      const html = ensureFirstTextBlock(page).html || "";
+
+      const prompt = [
+        { role: "system", content: "You are an expert web auditor. Return JSON ONLY with keys ok (boolean), summary (short), warnings (array), suggestions (array)." },
+        { role: "user", content:
+`Audit this HTML. Check:
+- basic structure (doctype, html/head/body best practices)
+- accessibility (lang, title, alt text, labels)
+- mobile meta viewport
+- heading order
+- obvious broken tags
+- excessive inline style bloat
+- contrast red flags
+
+Return STRICT JSON only like:
+{"ok":true,"summary":"...","warnings":["..."],"suggestions":["..."]}
+
+HTML:
+${html}` }
+      ];
+
+      const res = await openAiJson(prompt, { temperature: 0.2 });
+      const ok = !!res.ok;
+      const warnings = Array.isArray(res.warnings)?res.warnings:[];
+      const suggestions = Array.isArray(res.suggestions)?res.suggestions:[];
+      checkState.textContent = ok ? "OK" : "Warnings found";
+      checkOutput.innerHTML = `
+        <div class="${ok?'ok':'warn'}"><b>${ok?'Looks good':'Needs attention'}</b> — ${res.summary || '—'}</div>
+        ${warnings.length?('<ul>'+warnings.map(w=>`<li class="warn">${w}</li>`).join('')+'</ul>'):''}
+        ${suggestions.length?('<ul>'+suggestions.map(s=>`<li>${s}</li>`).join('')+'</ul>'):''}
+      `;
+      if (showToast) alert(ok ? "AI Check: Looks good" : "AI Check: See suggestions in the sidebar");
+    } catch(e){
+      checkState.textContent = "Error";
+      checkOutput.innerHTML = `<span class="err">AI check failed: ${e.message||e}</span>`;
+      console.error(e);
+    }
+  }
+  checkBtn.onclick = ()=>runCheck(true);
+
+  /**************** AI: Website Builder (BETA, client-side) ************/
+  aiBuildBtn.onclick = async ()=>{
+    try{
+      const desc = prompt("Describe the site you want (e.g., 'Portfolio for a photographer with Home, Gallery, Contact').");
+      if (!desc) return;
+      const pagesHint = prompt("Optional: comma-separated page slugs (e.g., home,about,contact). Leave blank to let AI choose.");
+
+      aiBuildOutput.textContent = "Thinking… (BETA)";
+
+      const prompt = [
+        { role: "system", content: "You are a website generator that outputs clean, responsive HTML sections for multiple pages. Use modern semantic HTML and minimal inline CSS. Return JSON only." },
+        { role: "user", content:
+`Generate HTML for a small static site.
+${pagesHint ? "User requested pages: "+pagesHint : "Choose 1–4 sensible pages for the site."}
+
+Constraints:
+- Minimal inline CSS (no external files)
+- Accessible markup (landmarks, alt text, labels)
+- Include a visible header with nav on every page
+- Return STRICT JSON only:
+{ "pages": { "<slug>": "<html string>", ... }, "warning": "<short caution>" }
+
+Site description:
+${desc}` }
+      ];
+
+      const res = await openAiJson(prompt, { temperature: 0.5 });
+      const pages = res.pages || {};
+      const warning = res.warning || "BETA: This will replace your current page content.";
+
+      if (!Object.keys(pages).length){
+        aiBuildOutput.innerHTML = '<span class="err">No pages returned.</span>';
+        return;
+      }
+
+      const confirmMsg = warning + "\n\nThis will REPLACE the current page HTML for the returned slugs. Continue?";
+      if (!confirm(confirmMsg)) { aiBuildOutput.textContent = "Cancelled."; return; }
+
+      // Overwrite page blocks with AI HTML
+      const newPages = {...(siteData.pages||{})};
+      for (const [slugRaw, htmlRaw] of Object.entries(pages)){
+        const slug = String(slugRaw).toLowerCase().replace(/[^a-z0-9-]/g,"");
+        if (!slug) continue;
+        const html = String(htmlRaw).slice(0, 200000);
+        newPages[slug] = { title: slug.charAt(0).toUpperCase()+slug.slice(1), blocks:[{ id:"b"+Math.random().toString(36).slice(2,8), type:"text", html }] };
+      }
+
+      await updateDoc(doc(db,"sites",sitename), { pages: newPages, updatedAt: serverTimestamp() });
+      siteData.pages = newPages;
+      renderPageList();
+      renderEditor();
+      renderPreview();
+      updateGutter();
+      aiBuildOutput.innerHTML = `<span class="ok">AI Builder complete.</span>`;
+    } catch(e){
+      console.error(e);
+      aiBuildOutput.innerHTML = `<span class="err">AI Builder failed: ${e.message||e}</span>`;
+    }
+  };
 </script>
 </body>
 </html>
