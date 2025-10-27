@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>LearningNova – Make</title>
+  <style>
+    :root{--bg:#0b1220;--card:#121a2b;--ink:#eaf2ff;--muted:#a9b6c7;--accent:#7dd3fc;--ring:rgba(125,211,252,.35)}
+    body{margin:0;background:linear-gradient(180deg,#08101e,#0b1220);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif}
+    header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d}
+    .wrap{display:grid;grid-template-columns:340px 1fr;gap:12px;padding:12px}
+    .card{background:#121a2b;border:1px solid #1b2a45;border-radius:14px;padding:12px}
+    select,input,textarea{width:100%;background:#0a1426;border:1px solid #1f3356;border-radius:10px;color:var(--ink);padding:8px}
+    textarea{min-height:50vh;font-family:ui-monospace,Menlo,monospace}
+    .row{display:flex;gap:8px;align-items:center}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid #204065;background:#101b31;color:var(--ink);cursor:pointer}
+    .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #2a3f65;border-radius:999px;background:#0e1a2e}
+    iframe{width:100%;height:70vh;background:#0b1220;border:1px solid #1b2a45;border-radius:12px}
+    .muted{color:#a9b6c7}
+  </style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <a class="pill" href="../">← Dashboard</a>
+    <span class="pill" id="siteTag"></span>
+  </div>
+  <div class="row">
+    <a class="pill" id="settingsLink">Settings</a>
+    <a class="pill" id="viewLink" target="_blank">View</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="card">
+    <h3>Edit Page</h3>
+    <label class="muted">Page</label>
+    <select id="pageSel"></select>
+    <label class="muted" style="margin-top:8px">HTML</label>
+    <textarea id="htmlBox" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="saveBtn" class="btn">Save Now</button>
+      <span class="muted" id="saveState">Idle</span>
+    </div>
+    <p class="muted" style="margin-top:6px">Autosave is on: changes are saved a second after you stop typing.</p>
+  </aside>
+
+  <main class="card">
+    <h3>Live Preview</h3>
+    <iframe id="preview"></iframe>
+  </main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  import { getFirestore, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { firebaseConfig } from "../firebase-config.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const params = new URLSearchParams(location.search);
+  const sitename = params.get("site");
+  if (!sitename){ alert("Missing ?site=..."); location.href="../"; }
+
+  const $ = s => document.querySelector(s);
+  const pageSel = $("#pageSel");
+  const htmlBox = $("#htmlBox");
+  const preview = $("#preview");
+  const saveBtn = $("#saveBtn");
+  const saveState = $("#saveState");
+  $("#siteTag").textContent = `/${sitename}`;
+  $("#settingsLink").href = `../settings.html?site=${encodeURIComponent(sitename)}`;
+  $("#viewLink").href = `https://learningnova.site/${encodeURIComponent(sitename)}`;
+
+  let siteData = null;
+  let currentSlug = null;
+  let unsub = null;
+  let typingTimer;
+
+  onAuthStateChanged(auth, (user)=>{
+    if (!user){ alert("Sign in first."); location.href="../auth.html"; return; }
+    subscribe();
+  });
+
+  function subscribe(){
+    const ref = doc(db,"sites",sitename);
+    unsub = onSnapshot(ref, (snap)=>{
+      if (!snap.exists()){ alert("Site not found."); location.href="../"; return; }
+      siteData = snap.data();
+      if (!currentSlug || !siteData.pages[currentSlug]) currentSlug = Object.keys(siteData.pages||{})[0];
+      renderPageList();
+      renderEditor();
+      renderPreview();
+    });
+  }
+
+  function renderPageList(){
+    pageSel.innerHTML = "";
+    const slugs = Object.keys(siteData.pages||{});
+    for (const slug of slugs){
+      const opt = document.createElement("option");
+      opt.value = slug;
+      opt.textContent = siteData.pages[slug].title || slug;
+      if (slug === currentSlug) opt.selected = true;
+      pageSel.appendChild(opt);
+    }
+    pageSel.onchange = ()=>{
+      currentSlug = pageSel.value;
+      renderEditor();
+      renderPreview();
+    };
+  }
+
+  function renderEditor(){
+    const page = siteData.pages[currentSlug];
+    const firstText = (page.blocks||[]).find(b=>b.type==="text");
+    if (!firstText){
+      // initialize a first text block if empty
+      page.blocks = [{ id: "b"+Math.random().toString(36).slice(2,8), type:"text", html:"<h1>New page</h1>" }];
+    }
+    const active = (page.blocks||[]).find(b=>b.type==="text");
+    htmlBox.value = active.html || "";
+  }
+
+  function renderPreview(){
+    const page = siteData.pages[currentSlug];
+    const html = (page.blocks||[]).filter(b=>b.type==="text").map(b=>b.html).join("\n");
+    preview.srcdoc = `<!doctype html><meta charset="utf-8"><style>body{margin:16px;color:#eaf2ff;background:#0b1220;font-family:system-ui,Arial}</style>${html}`;
+  }
+
+  async function saveNow(){
+    const page = siteData.pages[currentSlug];
+    const text = (page.blocks||[]).find(b=>b.type==="text");
+    if (!text) return;
+    text.html = htmlBox.value;
+    saveState.textContent = "Saving…";
+    await updateDoc(doc(db,"sites",sitename), { pages: siteData.pages, updatedAt: serverTimestamp() });
+    saveState.textContent = "Saved";
+    renderPreview();
+    setTimeout(()=>saveState.textContent="Idle", 1200);
+  }
+
+  saveBtn.onclick = saveNow;
+
+  htmlBox.addEventListener("input", ()=>{
+    saveState.textContent = "Typing…";
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(saveNow, 1000); // autosave 1s after typing stops
+  });
+</script>
+</body>
+</html>

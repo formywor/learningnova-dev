@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>LearningNova – Settings</title>
+  <style>
+    :root{--bg:#0b1220;--card:#121a2b;--ink:#eaf2ff;--muted:#a9b6c7;--accent:#7dd3fc;--ring:rgba(125,211,252,.35)}
+    body{margin:0;background:linear-gradient(180deg,#08101e,#0b1220);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif}
+    header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b1528;border-bottom:1px solid #15243d}
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    .card{background:#121a2b;border:1px solid #1b2a45;border-radius:14px;padding:14px;margin-bottom:14px}
+    .row{display:flex;gap:8px;align-items:center}
+    input,select{padding:8px;border-radius:10px;border:1px solid #1f3356;background:#0a1426;color:var(--ink)}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid #204065;background:#101b31;color:var(--ink);cursor:pointer}
+    .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #2a3f65;border-radius:999px;background:#0e1a2e}
+    .danger{border-color:#6b1d1d;background:#2a0f10}
+    .muted{color:#a9b6c7}
+    .list{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{padding:6px 10px;border:1px solid #1b2a45;border-radius:999px;background:#0f172a}
+    a{color:var(--accent);text-decoration:none}
+  </style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <a class="pill" href="./">← Dashboard</a>
+    <span class="pill" id="siteTag"></span>
+  </div>
+  <div class="row">
+    <a class="pill" id="openMake">Open Editor</a>
+    <a class="pill" id="viewLink" target="_blank">View</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h3>Publish</h3>
+    <div class="row">
+      <span>Status:</span> <span id="pubBadge" class="pill">—</span>
+      <button id="publish" class="btn">Publish</button>
+      <button id="unpublish" class="btn">Unpublish</button>
+      <span class="muted" style="margin-left:auto">Updated <span id="updatedAt">—</span></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Pages</h3>
+    <div class="list" id="pageList"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="newPage" placeholder="page-slug (home, about…)">
+      <button id="addPage" class="btn">Add Page</button>
+    </div>
+    <p class="muted">Right-click a page chip to delete it.</p>
+  </div>
+
+  <div class="card">
+    <h3>Danger Zone</h3>
+    <button id="deleteSite" class="btn danger">Delete Site</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  import { getFirestore, doc, onSnapshot, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { firebaseConfig } from "./firebase-config.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const params = new URLSearchParams(location.search);
+  const sitename = params.get("site");
+  if (!sitename){ alert("Missing ?site=..."); location.href="./"; }
+
+  const $ = s => document.querySelector(s);
+  $("#siteTag").textContent = `/${sitename}`;
+  $("#openMake").href = `./make/?site=${encodeURIComponent(sitename)}`;
+  $("#viewLink").href = `https://learningnova.site/${encodeURIComponent(sitename)}`;
+
+  const pubBadge = $("#pubBadge");
+  const updatedAt = $("#updatedAt");
+  const pageList = $("#pageList");
+
+  let data = null, unsub = null;
+
+  onAuthStateChanged(auth, (user)=>{
+    if (!user){ alert("Sign in first."); location.href="./auth.html"; return; }
+    const ref = doc(db,"sites",sitename);
+    unsub = onSnapshot(ref, (snap)=>{
+      if (!snap.exists()){ alert("Site not found."); location.href="./"; return; }
+      data = snap.data();
+      pubBadge.textContent = data.published ? "published" : "unpublished";
+      updatedAt.textContent = data.updatedAt?.toDate?.().toLocaleString?.() || "—";
+      renderPages();
+    });
+  });
+
+  function renderPages(){
+    pageList.innerHTML = "";
+    for (const [slug, page] of Object.entries(data.pages || {})){
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.textContent = page.title || slug;
+      chip.title = slug;
+      chip.oncontextmenu = async (e)=>{
+        e.preventDefault();
+        if (!confirm(`Delete page "${slug}"?`)) return;
+        const pages = {...data.pages};
+        delete pages[slug];
+        if (Object.keys(pages).length === 0) return alert("At least one page is required.");
+        await updateDoc(doc(db,"sites",sitename), { pages, updatedAt: serverTimestamp() });
+      };
+      pageList.appendChild(chip);
+    }
+  }
+
+  $("#addPage").onclick = async ()=>{
+    const slugEl = $("#newPage");
+    const slug = (slugEl.value||"").toLowerCase().trim().replace(/[^a-z0-9-]/g,"");
+    if (!slug) return alert("Enter a valid slug.");
+    if (data.pages[slug]) return alert("That page exists.");
+    const pages = {...data.pages};
+    pages[slug] = { title: slug.charAt(0).toUpperCase()+slug.slice(1), blocks:[{ id:"b"+Math.random().toString(36).slice(2,8), type:"text", html:"<h1>"+(slug.charAt(0).toUpperCase()+slug.slice(1))+"</h1>" }] };
+    await updateDoc(doc(db,"sites",sitename), { pages, updatedAt: serverTimestamp() });
+    slugEl.value = "";
+  };
+
+  $("#publish").onclick = async ()=>{ await updateDoc(doc(db,"sites",sitename), { published:true, updatedAt: serverTimestamp() }); alert("Published"); };
+  $("#unpublish").onclick = async ()=>{ await updateDoc(doc(db,"sites",sitename), { published:false, updatedAt: serverTimestamp() }); alert("Unpublished"); };
+  $("#deleteSite").onclick = async ()=>{
+    if (!confirm("Delete this site permanently?")) return;
+    await deleteDoc(doc(db,"sites",sitename));
+    alert("Deleted");
+    location.href="./";
+  };
+</script>
+</body>
+</html>

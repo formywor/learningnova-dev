@@ -15,7 +15,6 @@
     .btn{width:100%;padding:10px;border-radius:12px;border:1px solid #204065;background:#101b31;color:var(--ink);cursor:pointer}
     .btn:hover{box-shadow:0 0 0 3px var(--ring) inset}
     .row{display:flex;gap:8px}
-    .muted{color:var(--muted)}
     a{color:var(--accent);text-decoration:none}
   </style>
 </head>
@@ -23,24 +22,18 @@
 <div class="wrap">
   <div class="card">
     <h1>Welcome</h1>
-    <p class="muted">Sign in or create an account to build your site.</p>
-
+    <p>Sign in or create an account to build your site.</p>
     <input id="email" type="email" placeholder="Email"/>
     <input id="pw" type="password" placeholder="Password (min 6 chars)"/>
-
     <div class="row">
       <button id="login" class="btn">Sign In</button>
       <button id="signup" class="btn">Sign Up</button>
     </div>
-    <p class="muted" style="margin-top:10px;text-align:center">or</p>
+    <p style="text-align:center;color:#a9b6c7;margin:12px 0">or</p>
     <button id="google" class="btn">Continue with Google</button>
-
-    <p class="muted" style="margin-top:14px;text-align:center">
-      After signing in, <a href="./">go to the editor</a>.
-    </p>
+    <p style="text-align:center;margin-top:14px"><a href="./">Go to Dashboard</a></p>
   </div>
 </div>
-
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -48,31 +41,18 @@
   import { firebaseConfig } from "./firebase-config.js";
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-
   const $ = s => document.querySelector(s);
   $("#login").onclick = async ()=>{
-    const email = $("#email").value.trim();
-    const pw = $("#pw").value.trim();
-    if (!email || !pw) return alert("Enter email and password.");
-    try {
-      await signInWithEmailAndPassword(auth, email, pw);
-      location.href = "./";
-    } catch(e){ alert(e.message); }
+    try{ await signInWithEmailAndPassword(auth, $("#email").value.trim(), $("#pw").value.trim()); location.href="./"; }
+    catch(e){ alert(e.message); }
   };
   $("#signup").onclick = async ()=>{
-    const email = $("#email").value.trim();
-    const pw = $("#pw").value.trim();
-    if (!email || !pw) return alert("Enter email and password.");
-    try {
-      await createUserWithEmailAndPassword(auth, email, pw);
-      location.href = "./";
-    } catch(e){ alert(e.message); }
+    try{ await createUserWithEmailAndPassword(auth, $("#email").value.trim(), $("#pw").value.trim()); location.href="./"; }
+    catch(e){ alert(e.message); }
   };
   $("#google").onclick = async ()=>{
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      location.href = "./";
-    } catch(e){ alert(e.message); }
+    try{ await signInWithPopup(auth, new GoogleAuthProvider()); location.href="./"; }
+    catch(e){ alert(e.message); }
   };
 </script>
 </body>
