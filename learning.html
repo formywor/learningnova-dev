@@ -1,129 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Learn HTML — ScriptNova</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      margin: 0;
-      font-family: "Inter", sans-serif;
-      background: linear-gradient(135deg,#071021,#0b1220);
-      color: #e5e7eb;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    header {
-      text-align: center;
-      padding: 15px;
-      background: rgba(255,255,255,0.05);
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    #editor-container {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-    #lines {
-      background: #0f172a;
-      color: #64748b;
-      padding: 10px;
-      text-align: right;
-      user-select: none;
-      overflow-y: auto;
-      line-height: 1.4em;
-    }
-    #editor {
-      flex: 1;
-      padding: 10px;
-      background: #1e293b;
-      color: #f1f5f9;
-      font-family: monospace;
-      font-size: 14px;
-      line-height: 1.4em;
-      outline: none;
-      border: none;
-      resize: none;
-      overflow-y: auto;
-    }
-    #preview {
-      flex: 1;
-      background: white;
-      color: black;
-      padding: 10px;
-      overflow: auto;
-      border-left: 2px solid #0ea5e9;
-    }
-    #controls {
-      background: rgba(255,255,255,0.05);
-      padding: 10px;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-    button {
-      background: #0ea5e9;
-      border: none;
-      color: white;
-      padding: 8px 15px;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    button:hover { background: #22c55e; transform: scale(1.05); }
-    footer {
-      text-align: center;
-      padding: 10px;
-      background: rgba(255,255,255,0.05);
-      border-top: 1px solid rgba(255,255,255,0.1);
-      font-size: 0.9em;
-    }
-    #tips {
-      margin-top: 5px;
-      text-align: center;
-      font-size: 0.95em;
-      color: #a5b4fc;
-      min-height: 1.2em;
-    }
-    #loading {
-      display: none;
-      text-align: center;
-      color: #22c55e;
-      font-weight: bold;
-      animation: pulse 1s infinite;
-    }
-    @keyframes pulse {
-      0%,100%{opacity:1;}
-      50%{opacity:0.5;}
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Learn HTML — ScriptNova Tutor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    margin: 0;
+    font-family: "Inter", sans-serif;
+    background: linear-gradient(135deg,#071021,#0b1220);
+    color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    text-align: center;
+    padding: 15px;
+    background: rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  #editor-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #lines {
+    background: #0f172a;
+    color: #64748b;
+    padding: 10px;
+    text-align: right;
+    user-select: none;
+    overflow-y: auto;
+    line-height: 1.4em;
+  }
+  #editor {
+    flex: 1;
+    padding: 10px;
+    background: #1e293b;
+    color: #f1f5f9;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.4em;
+    outline: none;
+    border: none;
+    resize: none;
+    overflow-y: auto;
+  }
+  #preview {
+    flex: 1;
+    background: white;
+    color: black;
+    padding: 10px;
+    overflow: auto;
+    border-left: 2px solid #0ea5e9;
+  }
+  #controls {
+    background: rgba(255,255,255,0.05);
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #0ea5e9;
+    border: none;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover { background: #22c55e; transform: scale(1.05); }
+  footer {
+    text-align: center;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.9em;
+  }
+  #tips {
+    margin-top: 5px;
+    text-align: center;
+    font-size: 0.95em;
+    color: #a5b4fc;
+    min-height: 1.2em;
+  }
+  #loading {
+    display: none;
+    text-align: center;
+    color: #22c55e;
+    font-weight: bold;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1;} 50%{opacity:0.5;}
+  }
+
+  /* Chat UI */
+  #chatbox {
+    background: rgba(255,255,255,0.05);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 10px;
+    font-size: 0.95em;
+  }
+  #chat-input-area {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  #chat-input {
+    flex: 1;
+    background: #1e293b;
+    border: none;
+    color: white;
+    padding: 10px;
+    outline: none;
+  }
+  #send-chat {
+    background: #0ea5e9;
+    border: none;
+    padding: 10px 15px;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .ai { color: #22c55e; margin: 5px 0; }
+  .user { color: #60a5fa; margin: 5px 0; text-align: right; }
+</style>
 </head>
 <body>
-  <header>
-    <h1>Learn HTML — Interactive Tutor</h1>
-    <p>Start typing below to build your first webpage!</p>
-  </header>
+<header>
+  <h1>Learn HTML — ScriptNova Interactive Tutor</h1>
+  <p>Start typing below to build and learn HTML code!</p>
+</header>
 
-  <div id="editor-container">
-    <div id="lines"></div>
-    <textarea id="editor" spellcheck="false"></textarea>
-    <iframe id="preview"></iframe>
-  </div>
+<div id="editor-container">
+  <div id="lines"></div>
+  <textarea id="editor" spellcheck="false"></textarea>
+  <iframe id="preview"></iframe>
+</div>
 
-  <div id="controls">
-    <button id="run">Run Code</button>
-    <button id="check">Check Code (AI)</button>
-    <button id="tipsBtn">Show Hint</button>
-  </div>
-  <div id="loading">Translating your ideas into insights...</div>
-  <div id="tips"></div>
+<div id="controls">
+  <button id="run">Run Code</button>
+  <button id="check">Check Code (AI)</button>
+  <button id="tipsBtn">Show Hint</button>
+  <button id="challengeBtn">Challenges</button>
+  <button id="beginnerBtn">I don’t know how to code at all</button>
+</div>
+<div id="loading">Translating your ideas into insights...</div>
+<div id="tips"></div>
 
-  <footer>Made by the ScriptNova Team — made with love ❤️</footer>
+<!-- Chatbox -->
+<div id="chatbox"></div>
+<div id="chat-input-area">
+  <input type="text" id="chat-input" placeholder="Ask the ScriptNova Tutor anything...">
+  <button id="send-chat">Send</button>
+</div>
+
+<footer>Made by the ScriptNova Team — made with love ❤️</footer>
 
 <script>
-  // ✅ Insert your OpenAI key here (commas in key are ignored automatically)
+  // ✅ Insert your OpenAI key here (commas will be ignored)
   const OPENAI_KEY = ("sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA").replace(/,/g, "");
 
   const editor = document.getElementById("editor");
@@ -131,8 +172,9 @@
   const lines = document.getElementById("lines");
   const tips = document.getElementById("tips");
   const loading = document.getElementById("loading");
+  const chatbox = document.getElementById("chatbox");
+  const chatInput = document.getElementById("chat-input");
 
-  // Default starter code
   const starter = `<!DOCTYPE html>
 <html>
   <head>
@@ -149,19 +191,20 @@
   </body>
 </html>`;
   editor.value = starter;
-  updateLines();
 
   function updateLines() {
     const count = editor.value.split("\n").length;
     lines.innerHTML = Array.from({length: count}, (_, i)=> (i+1)).join("<br>");
   }
   editor.addEventListener("input", updateLines);
+  updateLines();
+
   document.getElementById("run").onclick = () => {
     const doc = preview.contentDocument || preview.contentWindow.document;
     doc.open(); doc.write(editor.value); doc.close();
   };
 
-  // Simple hints rotation
+  // Simple hints
   const hints = [
     "Every HTML file starts with <!DOCTYPE html> and <html>...</html>.",
     "Use <head> for setup, <body> for visible content.",
@@ -175,11 +218,8 @@
     hintIndex = (hintIndex + 1) % hints.length;
   };
 
-  // Check Code via OpenAI
-  document.getElementById("check").onclick = async () => {
-    const code = editor.value;
+  async function openaiReply(systemPrompt, userPrompt) {
     loading.style.display = "block";
-    tips.textContent = "";
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -189,23 +229,68 @@
         },
         body: JSON.stringify({
           model: "gpt-4o-mini",
-          messages: [{
-            role: "system",
-            content: "You are an expert HTML teacher. Explain errors and suggest improvements clearly."
-          },{
-            role: "user",
-            content: `Analyze this HTML and give feedback: \n\n${code}`
-          }]
+          messages: [
+            {role: "system", content: systemPrompt},
+            {role: "user", content: userPrompt}
+          ]
         })
       });
       const data = await res.json();
-      tips.textContent = data.choices?.[0]?.message?.content || "No feedback found.";
-    } catch(e){
-      tips.textContent = "Error checking code — verify your API key.";
+      const text = data.choices?.[0]?.message?.content || "No response.";
+      return text;
+    } catch {
+      return "Error contacting OpenAI (check your key).";
     } finally {
       loading.style.display = "none";
     }
+  }
+
+  document.getElementById("check").onclick = async ()=>{
+    const feedback = await openaiReply(
+      "You are an expert HTML teacher. Explain code errors and improvements clearly.",
+      editor.value
+    );
+    tips.textContent = feedback;
   };
+
+  // Challenge button
+  document.getElementById("challengeBtn").onclick = async ()=>{
+    const challenge = await openaiReply(
+      "You are a creative HTML challenge generator. Give a random beginner-friendly coding task, step by step.",
+      "Give the user a fun HTML challenge to practice skills."
+    );
+    addChat("ai", challenge);
+  };
+
+  // Beginner button
+  document.getElementById("beginnerBtn").onclick = async ()=>{
+    const lesson = await openaiReply(
+      "You are a friendly HTML mentor teaching someone who knows absolutely nothing about HTML. Explain everything clearly and step-by-step.",
+      "Teach the student everything from the basics — tags, structure, buttons, styling, animations — assume they’ve never coded before."
+    );
+    addChat("ai", lesson);
+  };
+
+  // Chat functionality
+  document.getElementById("send-chat").onclick = async ()=>{
+    const msg = chatInput.value.trim();
+    if (!msg) return;
+    addChat("user", msg);
+    chatInput.value = "";
+    const reply = await openaiReply(
+      "You are ScriptNova HTML Tutor AI. You are talking to a beginner learning HTML inside an interactive coding environment with live preview. Be kind, detailed, and educational.",
+      msg
+    );
+    addChat("ai", reply);
+  };
+
+  function addChat(role, text) {
+    const div = document.createElement("div");
+    div.className = role;
+    div.textContent = (role === "user" ? "You: " : "Tutor: ") + text;
+    chatbox.appendChild(div);
+    chatbox.scrollTop = chatbox.scrollHeight;
+  }
 </script>
 </body>
 </html>
