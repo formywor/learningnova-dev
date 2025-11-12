@@ -3,294 +3,349 @@
 <head>
 <meta charset="UTF-8">
 <title>Learn HTML — ScriptNova Tutor</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body {
-    margin: 0;
-    font-family: "Inter", sans-serif;
-    background: linear-gradient(135deg,#071021,#0b1220);
-    color: #e5e7eb;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-  }
-  header {
-    text-align: center;
-    padding: 15px;
-    background: rgba(255,255,255,0.05);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-  #editor-container {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-  #lines {
-    background: #0f172a;
-    color: #64748b;
-    padding: 10px;
-    text-align: right;
-    user-select: none;
-    overflow-y: auto;
-    line-height: 1.4em;
-  }
-  #editor {
-    flex: 1;
-    padding: 10px;
-    background: #1e293b;
-    color: #f1f5f9;
-    font-family: monospace;
-    font-size: 14px;
-    line-height: 1.4em;
-    outline: none;
-    border: none;
-    resize: none;
-    overflow-y: auto;
-  }
-  #preview {
-    flex: 1;
-    background: white;
-    color: black;
-    padding: 10px;
-    overflow: auto;
-    border-left: 2px solid #0ea5e9;
-  }
-  #controls {
-    background: rgba(255,255,255,0.05);
-    padding: 10px;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  button {
-    background: #0ea5e9;
-    border: none;
-    color: white;
-    padding: 8px 15px;
-    border-radius: 8px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-  button:hover { background: #22c55e; transform: scale(1.05); }
-  footer {
-    text-align: center;
-    padding: 10px;
-    background: rgba(255,255,255,0.05);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    font-size: 0.9em;
-  }
-  #tips {
-    margin-top: 5px;
-    text-align: center;
-    font-size: 0.95em;
-    color: #a5b4fc;
-    min-height: 1.2em;
-  }
-  #loading {
-    display: none;
-    text-align: center;
-    color: #22c55e;
-    font-weight: bold;
-    animation: pulse 1s infinite;
-  }
-  @keyframes pulse {
-    0%,100%{opacity:1;} 50%{opacity:0.5;}
-  }
-
-  /* Chat UI */
-  #chatbox {
-    background: rgba(255,255,255,0.05);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    max-height: 250px;
-    overflow-y: auto;
-    padding: 10px;
-    font-size: 0.95em;
-  }
-  #chat-input-area {
-    display: flex;
-    border-top: 1px solid rgba(255,255,255,0.1);
-  }
-  #chat-input {
-    flex: 1;
-    background: #1e293b;
-    border: none;
-    color: white;
-    padding: 10px;
-    outline: none;
-  }
-  #send-chat {
-    background: #0ea5e9;
-    border: none;
-    padding: 10px 15px;
-    color: white;
-    cursor: pointer;
-    font-weight: bold;
-  }
-  .ai { color: #22c55e; margin: 5px 0; }
-  .user { color: #60a5fa; margin: 5px 0; text-align: right; }
+:root {
+  --bg:#0b1220;
+  --panel:#111827;
+  --text:#e5e7eb;
+  --accent:#34d3ff;
+  --accent2:#22c55e;
+  --bubble:#1e293b;
+  --bubble-ai:#0f172a;
+}
+body {
+  margin:0;
+  font-family:"Inter",sans-serif;
+  background:linear-gradient(135deg,#071021,#0b1220);
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+header {
+  text-align:center;
+  padding:16px;
+  background:rgba(255,255,255,0.05);
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+#main {
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+#editor-container {
+  flex:2;
+  display:flex;
+  overflow:hidden;
+  border-right:2px solid var(--accent);
+}
+#lines {
+  background:var(--panel);
+  color:#64748b;
+  padding:10px;
+  text-align:right;
+  user-select:none;
+  overflow-y:auto;
+}
+#editor {
+  flex:1;
+  padding:10px;
+  background:#1e293b;
+  color:#f8fafc;
+  font-family:monospace;
+  font-size:14px;
+  border:none;
+  outline:none;
+  resize:none;
+}
+#preview {
+  flex:1.2;
+  background:white;
+  color:black;
+  overflow:auto;
+}
+#right-panel {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  border-left:2px solid var(--accent);
+  background:var(--panel);
+}
+#controls {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:10px;
+  padding:10px;
+  background:rgba(255,255,255,0.03);
+}
+button {
+  background:var(--accent);
+  border:none;
+  color:white;
+  padding:8px 12px;
+  border-radius:6px;
+  font-weight:bold;
+  cursor:pointer;
+  transition:.2s;
+}
+button:hover {
+  background:var(--accent2);
+  transform:scale(1.05);
+}
+#chatbox {
+  flex:1;
+  overflow-y:auto;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.message {
+  max-width:90%;
+  padding:10px 14px;
+  border-radius:12px;
+  line-height:1.4em;
+  white-space:pre-wrap;
+  word-break:break-word;
+  position:relative;
+}
+.message.user {
+  background:var(--accent);
+  color:white;
+  align-self:flex-end;
+  border-bottom-right-radius:4px;
+}
+.message.ai {
+  background:var(--bubble-ai);
+  align-self:flex-start;
+  border-bottom-left-radius:4px;
+}
+.reply-btn {
+  position:absolute;
+  bottom:4px;
+  right:8px;
+  font-size:12px;
+  color:#9ca3af;
+  cursor:pointer;
+  display:none;
+}
+.message.ai:hover .reply-btn {
+  display:block;
+}
+.reply-context {
+  font-size:12px;
+  opacity:.7;
+  margin-bottom:5px;
+}
+#chat-input-area {
+  display:flex;
+  border-top:1px solid rgba(255,255,255,0.1);
+}
+#chat-input {
+  flex:1;
+  background:#1e293b;
+  border:none;
+  color:white;
+  padding:10px;
+  outline:none;
+}
+#send-chat {
+  background:var(--accent);
+  border:none;
+  padding:10px 15px;
+  color:white;
+  cursor:pointer;
+}
+#loading {
+  display:none;
+  text-align:center;
+  color:var(--accent2);
+  font-weight:bold;
+  animation:pulse 1s infinite;
+  padding:5px;
+}
+@keyframes pulse {
+  0%,100%{opacity:1}50%{opacity:.5}
+}
+footer {
+  text-align:center;
+  padding:10px;
+  background:rgba(255,255,255,0.05);
+  border-top:1px solid rgba(255,255,255,0.1);
+  font-size:.9em;
+}
+pre, code {
+  background:rgba(255,255,255,0.05);
+  padding:5px;
+  border-radius:6px;
+  font-size:13px;
+  overflow-x:auto;
+}
+h3,h4 { color:var(--accent2); margin:8px 0 4px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Learn HTML — ScriptNova Interactive Tutor</h1>
-  <p>Start typing below to build and learn HTML code!</p>
+  <h1>ScriptNova HTML Tutor</h1>
+  <p>Interactive AI-powered HTML learning environment</p>
 </header>
 
-<div id="editor-container">
-  <div id="lines"></div>
-  <textarea id="editor" spellcheck="false"></textarea>
+<div id="main">
+  <div id="editor-container">
+    <div id="lines"></div>
+    <textarea id="editor" spellcheck="false"></textarea>
+  </div>
   <iframe id="preview"></iframe>
-</div>
 
-<div id="controls">
-  <button id="run">Run Code</button>
-  <button id="check">Check Code (AI)</button>
-  <button id="tipsBtn">Show Hint</button>
-  <button id="challengeBtn">Challenges</button>
-  <button id="beginnerBtn">I don’t know how to code at all</button>
-</div>
-<div id="loading">Translating your ideas into insights...</div>
-<div id="tips"></div>
-
-<!-- Chatbox -->
-<div id="chatbox"></div>
-<div id="chat-input-area">
-  <input type="text" id="chat-input" placeholder="Ask the ScriptNova Tutor anything...">
-  <button id="send-chat">Send</button>
+  <div id="right-panel">
+    <div id="controls">
+      <button id="run">Run</button>
+      <button id="check">Check Code</button>
+      <button id="challenge">Challenges</button>
+      <button id="beginner">I don’t know how to code</button>
+    </div>
+    <div id="loading">Loading...</div>
+    <div id="chatbox"></div>
+    <div id="chat-input-area">
+      <input id="chat-input" placeholder="Ask ScriptNova Tutor..." />
+      <button id="send-chat">Send</button>
+    </div>
+  </div>
 </div>
 
 <footer>Made by the ScriptNova Team — made with love ❤️</footer>
 
 <script>
-  // ✅ Insert your OpenAI key here (commas will be ignored)
-  const OPENAI_KEY = ("sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA").replace(/,/g, "");
+const OPENAI_KEY=("sk-proj-esQZvuHfktHXvSoEtfPRy-IZuDRXYWSTrtphEqUXFlTds,1tOHtjZzg3daCpD_VzKs7yT0I8p_HT3BlbkFJFlcclxKg8g_R6gscPp1gekMQXtDmVkwzkKY6Y4LJtSGfDxC7EMVWj16dzS9sM-dz3TaRb52zkA").replace(/,/g,"");
 
-  const editor = document.getElementById("editor");
-  const preview = document.getElementById("preview");
-  const lines = document.getElementById("lines");
-  const tips = document.getElementById("tips");
-  const loading = document.getElementById("loading");
-  const chatbox = document.getElementById("chatbox");
-  const chatInput = document.getElementById("chat-input");
+const editor=document.getElementById("editor");
+const preview=document.getElementById("preview");
+const lines=document.getElementById("lines");
+const chatbox=document.getElementById("chatbox");
+const chatInput=document.getElementById("chat-input");
+const loading=document.getElementById("loading");
 
-  const starter = `<!DOCTYPE html>
+editor.value=`<!DOCTYPE html>
 <html>
   <head>
     <title>My First Page</title>
     <style>
-      body { font-family: Arial; background: #f0f0f0; text-align:center; }
-      button { background: #0ea5e9; color:white; border:none; padding:10px 20px; border-radius:5px; }
-      button:hover { background:#22c55e; }
+      body {font-family:Arial;text-align:center;background:#f0f0f0;}
+      button{background:#34d3ff;color:white;border:none;padding:10px 20px;border-radius:5px;}
+      button:hover{background:#22c55e;}
     </style>
   </head>
   <body>
-    <h1>Hello World!</h1>
-    <button>Click me!</button>
+    <h1>Hello, World!</h1>
+    <button>Click Me</button>
   </body>
 </html>`;
-  editor.value = starter;
+updateLines();
 
-  function updateLines() {
-    const count = editor.value.split("\n").length;
-    lines.innerHTML = Array.from({length: count}, (_, i)=> (i+1)).join("<br>");
+function updateLines(){
+  const count=editor.value.split("\n").length;
+  lines.innerHTML=Array.from({length:count},(_,i)=>i+1).join("<br>");
+}
+editor.addEventListener("input",updateLines);
+
+document.getElementById("run").onclick=()=>{
+  const doc=preview.contentDocument||preview.contentWindow.document;
+  doc.open();doc.write(editor.value);doc.close();
+}
+
+async function askAI(system,user){
+  loading.style.display="block";
+  try{
+    const res=await fetch("https://api.openai.com/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":`Bearer ${OPENAI_KEY}`
+      },
+      body:JSON.stringify({
+        model:"gpt-4o-mini",
+        messages:[
+          {role:"system",content:system},
+          {role:"user",content:user}
+        ]
+      })
+    });
+    const data=await res.json();
+    return data.choices?.[0]?.message?.content||"No response.";
+  }catch(e){return"Connection error."}
+  finally{loading.style.display="none";}
+}
+
+document.getElementById("check").onclick=async()=>{
+  addMsg("ai","Analyzing your code...");
+  const r=await askAI("You are an HTML tutor. Find errors or improvements in this code.","Code:\n"+editor.value);
+  addMsg("ai",r);
+};
+
+document.getElementById("challenge").onclick=async()=>{
+  const r=await askAI("You are a friendly HTML tutor.","Give me a new HTML coding challenge, step by step.");
+  addMsg("ai",r);
+};
+
+document.getElementById("beginner").onclick=async()=>{
+  const r=await askAI(
+    "You are a gentle HTML teacher explaining to a complete beginner. Format your response with clear headings and code blocks, short paragraphs.",
+    "Teach me HTML from the very start like I'm brand new. Make it visually clean and easy to follow."
+  );
+  addMsg("ai",r,true);
+};
+
+document.getElementById("send-chat").onclick=()=>sendMsg();
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter")sendMsg();});
+
+let replyContext=null;
+
+function sendMsg(){
+  const text=chatInput.value.trim();
+  if(!text)return;
+  addMsg("user",text);
+  chatInput.value="";
+  let msg=text;
+  if(replyContext) msg="(User is replying to this previous AI message: '"+replyContext+"') "+text;
+  talkToTutor(msg);
+  replyContext=null;
+}
+
+async function talkToTutor(text){
+  const r=await askAI(
+    "You are ScriptNova HTML Tutor. You can see the user's HTML code and progress. Be concise, friendly, and explain terms simply.",
+    "User's code:\n"+editor.value+"\nQuestion:\n"+text
+  );
+  addMsg("ai",r,true);
+}
+
+function addMsg(role,text,rich=false){
+  const div=document.createElement("div");
+  div.className="message "+role;
+  if(role==="ai"){
+    const reply=document.createElement("div");
+    reply.textContent="Reply";
+    reply.className="reply-btn";
+    reply.onclick=()=>{replyContext=text;chatInput.placeholder="Replying... (press Enter to send)";};
+    div.appendChild(reply);
   }
-  editor.addEventListener("input", updateLines);
-  updateLines();
-
-  document.getElementById("run").onclick = () => {
-    const doc = preview.contentDocument || preview.contentWindow.document;
-    doc.open(); doc.write(editor.value); doc.close();
-  };
-
-  // Simple hints
-  const hints = [
-    "Every HTML file starts with <!DOCTYPE html> and <html>...</html>.",
-    "Use <head> for setup, <body> for visible content.",
-    "Make buttons with <button>Click</button>.",
-    "Use CSS for color, size, and animation!",
-    "Animations: @keyframes move { from {left:0;} to {left:100px;} }"
-  ];
-  let hintIndex = 0;
-  document.getElementById("tipsBtn").onclick = ()=>{
-    tips.textContent = hints[hintIndex];
-    hintIndex = (hintIndex + 1) % hints.length;
-  };
-
-  async function openaiReply(systemPrompt, userPrompt) {
-    loading.style.display = "block";
-    try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {role: "system", content: systemPrompt},
-            {role: "user", content: userPrompt}
-          ]
-        })
-      });
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || "No response.";
-      return text;
-    } catch {
-      return "Error contacting OpenAI (check your key).";
-    } finally {
-      loading.style.display = "none";
-    }
+  if(rich){
+    // Format markdown-like
+    text=text
+      .replace(/^### (.*)$/gm,"<h3>$1</h3>")
+      .replace(/^#### (.*)$/gm,"<h4>$1</h4>")
+      .replace(/```html([\s\S]*?)```/gm,"<pre><code>$1</code></pre>")
+      .replace(/```css([\s\S]*?)```/gm,"<pre><code>$1</code></pre>")
+      .replace(/```([\s\S]*?)```/gm,"<pre><code>$1</code></pre>");
+    div.innerHTML=text;
+  } else {
+    div.textContent=text;
   }
-
-  document.getElementById("check").onclick = async ()=>{
-    const feedback = await openaiReply(
-      "You are an expert HTML teacher. Explain code errors and improvements clearly.",
-      editor.value
-    );
-    tips.textContent = feedback;
-  };
-
-  // Challenge button
-  document.getElementById("challengeBtn").onclick = async ()=>{
-    const challenge = await openaiReply(
-      "You are a creative HTML challenge generator. Give a random beginner-friendly coding task, step by step.",
-      "Give the user a fun HTML challenge to practice skills."
-    );
-    addChat("ai", challenge);
-  };
-
-  // Beginner button
-  document.getElementById("beginnerBtn").onclick = async ()=>{
-    const lesson = await openaiReply(
-      "You are a friendly HTML mentor teaching someone who knows absolutely nothing about HTML. Explain everything clearly and step-by-step.",
-      "Teach the student everything from the basics — tags, structure, buttons, styling, animations — assume they’ve never coded before."
-    );
-    addChat("ai", lesson);
-  };
-
-  // Chat functionality
-  document.getElementById("send-chat").onclick = async ()=>{
-    const msg = chatInput.value.trim();
-    if (!msg) return;
-    addChat("user", msg);
-    chatInput.value = "";
-    const reply = await openaiReply(
-      "You are ScriptNova HTML Tutor AI. You are talking to a beginner learning HTML inside an interactive coding environment with live preview. Be kind, detailed, and educational.",
-      msg
-    );
-    addChat("ai", reply);
-  };
-
-  function addChat(role, text) {
-    const div = document.createElement("div");
-    div.className = role;
-    div.textContent = (role === "user" ? "You: " : "Tutor: ") + text;
-    chatbox.appendChild(div);
-    chatbox.scrollTop = chatbox.scrollHeight;
-  }
+  chatbox.appendChild(div);
+  chatbox.scrollTop=chatbox.scrollHeight;
+}
 </script>
 </body>
 </html>
