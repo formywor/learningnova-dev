@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Studying Music</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+    body {
+        background: #0f172a;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        font-family: Arial, sans-serif;
+    }
+    button {
+        padding: 15px 30px;
+        font-size: 20px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        background: #2563eb;
+        color: white;
+        transition: 0.2s;
+    }
+    button:hover {
+        background: #1d4ed8;
+    }
+</style>
+</head>
+<body>
+
+<audio id="player" src="music.mp4" autoplay loop></audio>
+
+<button id="controlBtn">Pause</button>
+
+<script>
+    const player = document.getElementById('player');
+    const btn = document.getElementById('controlBtn');
+
+    btn.addEventListener('click', () => {
+        if (player.paused) {
+            player.play();
+            btn.textContent = "Pause";
+        } else {
+            player.pause();
+            btn.textContent = "Play";
+        }
+    });
+</script>
+
+</body>
+</html>
