@@ -1,55 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Studying Music</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-    body {
-        background: #0f172a;
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-        font-family: Arial, sans-serif;
-    }
-    button {
-        padding: 15px 30px;
-        font-size: 20px;
-        border-radius: 10px;
-        border: none;
-        cursor: pointer;
-        background: #2563eb;
-        color: white;
-        transition: 0.2s;
-    }
-    button:hover {
-        background: #1d4ed8;
-    }
+  :root { --bg:#0f172a; --btn:#2563eb; --btnHover:#1d4ed8; --ink:#ffffff; --muted:#94a3b8; }
+  html,body { height:100%; margin:0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  .wrap { text-align:center; }
+  button {
+    padding: 15px 30px;
+    font-size: 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    background: var(--btn);
+    color: #fff;
+    transition: transform .06s ease, background .2s ease;
+  }
+  button:hover { background: var(--btnHover); }
+  button:active { transform: scale(0.98); }
+  .hint {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    min-height: 1.2em; /* reserve space so layout doesn't jump */
+  }
 </style>
 </head>
 <body>
 
-<audio id="player" src="Chill.mp4" autoplay loop></audio>
+<div class="wrap">
+  <!-- Replace music.mp4 with your actual file path or URL -->
+  <audio id="player"
+         src="Chill.mp4"
+         preload="auto"
+         autoplay
+         loop
+         playsinline></audio>
 
-<button id="controlBtn">Pause</button>
+  <button id="controlBtn" aria-label="Pause">Pause</button>
+  <div id="hint" class="hint"></div>
+</div>
 
 <script>
-    const player = document.getElementById('player');
-    const btn = document.getElementById('controlBtn');
+  const player = document.getElementById('player');
+  const btn = document.getElementById('controlBtn');
+  const hint = document.getElementById('hint');
 
-    btn.addEventListener('click', () => {
-        if (player.paused) {
-            player.play();
-            btn.textContent = "Pause";
-        } else {
-            player.pause();
-            btn.textContent = "Play";
-        }
-    });
+  // Keep button text in sync with playback state
+  function refreshButton() {
+    btn.textContent = player.paused ? 'Play' : 'Pause';
+    btn.setAttribute('aria-label', btn.textContent);
+  }
+
+  // Try to play with sound immediately.
+  async function startPlayback() {
+    try {
+      player.muted = false;      // try with sound first
+      await player.play();       // if allowed, great
+      hint.textContent = '';     // no hint needed
+    } catch (e1) {
+      // Autoplay with sound blocked -> fall back to muted autoplay
+      try {
+        player.muted = true;
+        await player.play();
+        hint.textContent = 'Sound is off (autoplay policy). Tap anywhere once to enable sound.';
+        // First user gesture will unmute
+        const enableSoundOnce = () => {
+          player.muted = false;
+          hint.textContent = '';
+          window.removeEventListener('click', enableSoundOnce);
+          window.removeEventListener('touchstart', enableSoundOnce);
+        };
+        window.addEventListener('click', enableSoundOnce, { once: true });
+        window.addEventListener('touchstart', enableSoundOnce, { once: true });
+      } catch (e2) {
+        // If even muted autoplay is blocked (rare), show a brief hint
+        hint.textContent = 'Tap Play to start.';
+      }
+    } finally {
+      refreshButton();
+    }
+  }
+
+  // Button toggles play/pause
+  btn.addEventListener('click', async () => {
+    if (player.paused) {
+      try { await player.play(); } catch {}
+    } else {
+      player.pause();
+    }
+    refreshButton();
+  });
+
+  // Keep UI synced on native events
+  player.addEventListener('play', refreshButton);
+  player.addEventListener('pause', refreshButton);
+
+  // Kick things off as soon as possible
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startPlayback);
+  } else {
+    startPlayback();
+  }
 </script>
 
 </body>
